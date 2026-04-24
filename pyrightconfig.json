@@ -2,5 +2,10 @@
   "venvPath": ".",
   "venv": ".venv",
   "pythonVersion": "3.12",
-  "include": ["packages", "tests"]
+  "include": ["packages", "tests"],
+  "extraPaths": [
+    "packages/wttj-models/src",
+    "packages/wttj-scraper/src",
+    "packages/wttj-cli/src"
+  ]
 }
