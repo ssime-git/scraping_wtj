@@ -55,7 +55,14 @@ async def test_scrape_listing_navigates_and_scrolls(mock_context_with_jobs, mock
     mock_page_with_jobs.goto.assert_awaited_once_with(
         url, wait_until="domcontentloaded", timeout=60_000
     )
-    mock_page_with_jobs.mouse.wheel.assert_awaited_once_with(0, 2500)
+    mock_page_with_jobs.mouse.wheel.assert_awaited_once_with(0, 3_000)
+
+
+@pytest.mark.asyncio
+async def test_scrape_listing_scroll_count(mock_context_with_jobs, mock_page_with_jobs):
+    url = "https://www.welcometothejungle.com/fr/jobs"
+    await scrape_listing(mock_context_with_jobs, url, scroll_count=3)
+    assert mock_page_with_jobs.mouse.wheel.await_count == 3
 
 
 @pytest.mark.asyncio

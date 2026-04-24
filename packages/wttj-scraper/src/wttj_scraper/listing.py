@@ -31,14 +31,15 @@ _EXTRACT_JS = """
 
 
 async def scrape_listing(
-    context: BrowserContext, url: str, max_jobs: int = 30
+    context: BrowserContext, url: str, max_jobs: int = 30, scroll_count: int = 1
 ) -> list[JobListing]:
     page = await context.new_page()
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
         await page.wait_for_timeout(2_500)
-        await page.mouse.wheel(0, 2_500)
-        await page.wait_for_timeout(1_500)
+        for _ in range(scroll_count):
+            await page.mouse.wheel(0, 3_000)
+            await page.wait_for_timeout(1_500)
         raw: list[dict] = await page.evaluate(_EXTRACT_JS, max_jobs)
         return [JobListing(**item) for item in raw]
     finally:

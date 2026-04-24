@@ -13,9 +13,10 @@ async def scrape(
     url: str,
     max_jobs: int = 30,
     enrich_count: int = 15,
+    scroll_count: int = 1,
 ) -> ScrapeResult:
     async with browser_context() as context:
-        listings = await scrape_listing(context, url, max_jobs)
+        listings = await scrape_listing(context, url, max_jobs, scroll_count)
         enriched = []
         for job in listings[:enrich_count]:
             detail = await scrape_detail(context, job)
