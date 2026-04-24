@@ -38,6 +38,24 @@ def test_job_detail_can_hold_error():
     assert detail.error == "timeout"
 
 
+def test_job_detail_supports_structured_fields():
+    detail = JobDetail(
+        title="Alternant Marketing",
+        url="https://example.com/jobs/4",
+        snippet="Theraclion · Malakoff",
+        company_name="Theraclion",
+        company_sectors=["MedTech", "AI"],
+        contract_type="Alternance",
+        remote_level="Occasional remote",
+        languages_required=["French", "English"],
+        skills_hard=["SEO", "CRM"],
+        description_raw="Mission text",
+    )
+    assert detail.company_name == "Theraclion"
+    assert detail.company_sectors == ["MedTech", "AI"]
+    assert detail.skills_hard == ["SEO", "CRM"]
+
+
 def test_scrape_result_counts_jobs():
     jobs = [
         JobDetail(title="A", url="https://example.com/jobs/1", snippet=None),

@@ -1,5 +1,4 @@
 import asyncio
-import csv
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,6 +6,7 @@ from pathlib import Path
 from wttj_scraper.browser import browser_context
 from wttj_scraper.detail import scrape_detail
 from wttj_scraper.listing import scrape_listing
+from wttj_scraper.storage import write_jobs_parquet
 
 LISTING_URL = "https://www.welcometothejungle.com/fr/jobs"
 SCROLL_COUNT = 3
@@ -14,10 +14,8 @@ MAX_JOBS = 60
 ENRICH_COUNT = 10
 
 DATA_DIR = Path(os.getenv("DATA_DIR", str(Path(__file__).parent.parent / "data")))
-CSV_FILE = DATA_DIR / "jobs.csv"
+PARQUET_FILE = DATA_DIR / "jobs.parquet"
 SEEN_URLS_FILE = DATA_DIR / "seen_urls.txt"
-
-CSV_FIELDS = ["title", "url", "snippet", "page_title", "text_preview", "error", "source", "scraped_at"]
 
 
 def load_seen_urls() -> set[str]:
@@ -31,24 +29,14 @@ def append_seen_urls(new_urls: list[str]) -> None:
         for url in new_urls:
             f.write(url + "\n")
 
-
-def append_to_csv(rows: list[dict]) -> None:
-    write_header = not CSV_FILE.exists()
-    with CSV_FILE.open("a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
-        if write_header:
-            writer.writeheader()
-        writer.writerows(rows)
-
-
 def push_to_hf() -> None:
     from huggingface_hub import HfApi
 
     api = HfApi(token=os.environ["HF_TOKEN"])
     repo_id = os.environ["HF_DATASET_REPO"]
     api.upload_file(
-        path_or_fileobj=str(CSV_FILE),
-        path_in_repo="jobs.csv",
+        path_or_fileobj=str(PARQUET_FILE),
+        path_in_repo="jobs.parquet",
         repo_id=repo_id,
         repo_type="dataset",
     )
@@ -85,14 +73,20 @@ async def main() -> None:
 
     scraped_at = datetime.now(timezone.utc).isoformat()
     rows = [
-        {**job.model_dump(), "source": LISTING_URL, "scraped_at": scraped_at}
+        {
+            **job.model_dump(),
+            "job_title": job.job_title or job.title,
+            "job_url": job.job_url or job.url,
+            "source": LISTING_URL,
+            "scraped_at": scraped_at,
+        }
         for job in enriched
     ]
 
-    append_to_csv(rows)
+    write_jobs_parquet(rows, PARQUET_FILE)
     append_seen_urls([job.url for job in enriched])
 
-    print(f"Saved {len(rows)} new jobs → {CSV_FILE}")
+    print(f"Saved {len(rows)} new jobs → {PARQUET_FILE}")
     print(f"Total seen URLs: {len(seen_urls) + len(rows)}")
 
     if os.getenv("HF_TOKEN") and os.getenv("HF_DATASET_REPO"):

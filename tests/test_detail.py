@@ -22,6 +22,15 @@ def mock_detail_page():
         return_value={
             "page_title": "Dev Python | Acme | Welcome to the Jungle",
             "text_preview": "Nous recherchons un développeur Python confirmé...",
+            "company_name": "Theraclion",
+            "contract_type": "Alternance",
+            "remote_level": "Télétravail occasionnel",
+            "city": "Malakoff",
+            "company_sectors": ["MedTech", "AI"],
+            "languages_required": ["French", "English"],
+            "description_raw": "Description section",
+            "missions_raw": "Mission section",
+            "profile_raw": "Profile section",
         }
     )
     page.close = AsyncMock()
@@ -44,6 +53,11 @@ async def test_scrape_detail_returns_job_detail(mock_context_detail, base_listin
     assert result.title == base_listing.title
     assert result.page_title == "Dev Python | Acme | Welcome to the Jungle"
     assert "développeur" in result.text_preview
+    assert result.company_name == "Theraclion"
+    assert result.contract_type == "Alternance"
+    assert result.remote_level == "Télétravail occasionnel"
+    assert result.city == "Malakoff"
+    assert result.languages_required == ["French", "English"]
     assert result.error is None
 
 

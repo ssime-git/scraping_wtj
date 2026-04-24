@@ -1373,6 +1373,7 @@ source = { editable = "packages/wttj-app" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "pandas" },
+    { name = "pyarrow" },
     { name = "streamlit" },
 ]
 
@@ -1380,6 +1381,7 @@ dependencies = [
 requires-dist = [
     { name = "huggingface-hub", specifier = ">=0.22" },
     { name = "pandas", specifier = ">=2.0" },
+    { name = "pyarrow", specifier = ">=16.0" },
     { name = "streamlit", specifier = ">=1.44" },
 ]
 
@@ -1410,7 +1412,9 @@ name = "wttj-scraper"
 version = "0.1.0"
 source = { editable = "packages/wttj-scraper" }
 dependencies = [
+    { name = "pandas" },
     { name = "playwright" },
+    { name = "pyarrow" },
     { name = "wttj-models" },
 ]
 
@@ -1422,7 +1426,9 @@ hf = [
 [package.metadata]
 requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=0.22" },
+    { name = "pandas", specifier = ">=2.0" },
     { name = "playwright", specifier = ">=1.40" },
+    { name = "pyarrow", specifier = ">=16.0" },
     { name = "wttj-models", editable = "packages/wttj-models" },
 ]
 provides-extras = ["hf"]

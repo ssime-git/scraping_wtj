@@ -37,7 +37,7 @@ jobs:
 
           from huggingface_hub import hf_hub_download
 
-          for filename in ("jobs.csv", "seen_urls.txt"):
+          for filename in ("jobs.parquet", "seen_urls.txt"):
               try:
                   path = hf_hub_download(
                       repo_id=os.environ["HF_DATASET_REPO"],

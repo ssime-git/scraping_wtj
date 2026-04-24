@@ -12,4 +12,11 @@ pinned: false
 
 Browse and download job offers scraped daily from Welcome to the Jungle.
 
-Set the `HF_DATASET_REPO` Space secret to point to your dataset repository (e.g. `your-username/wttj-jobs`).
+Required Space secrets:
+
+- `HF_DATASET_REPO`
+- `HF_TOKEN`
+- `APP_USERNAME`
+- `APP_PASSWORD`
+
+The app reads `jobs.parquet` from the private dataset and only exposes the data after authentication.

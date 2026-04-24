@@ -5,6 +5,8 @@ requires-python = ">=3.12"
 dependencies = [
     "playwright>=1.40",
     "wttj-models",
+    "pandas>=2.0",
+    "pyarrow>=16.0",
 ]
 
 [project.optional-dependencies]
