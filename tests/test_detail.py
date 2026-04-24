@@ -132,6 +132,75 @@ def test_parse_summary_metadata_extracts_wttj_header_facts():
     assert metadata["skills_hard"] == ["Gestion des entretiens", "Efficacité opérationnelle"]
 
 
+def test_parse_summary_metadata_rejects_faq_question_as_remote_level():
+    summary = """
+    Alternance - Chargée ou Chargé de Communication et Marketing Digital- Master F/H
+    Alternance
+    Marseille
+    Le télétravail est-il possible pour ce poste ?
+    Salaire :
+    Non spécifié
+    """
+
+    metadata = parse_summary_metadata(summary)
+
+    assert metadata["contract_type"] == "Alternance"
+    assert metadata["city"] == "Marseille"
+    assert metadata["remote_level"] is None
+    assert metadata["salary_label"] == "Non spécifié"
+
+
+def test_parse_summary_metadata_supports_observed_contracts_and_cities():
+    metadata = parse_summary_metadata(
+        "Chargé de mission Abeille Assurances Autres Bois-Colombes Télétravail non autorisé"
+    )
+
+    assert metadata["contract_type"] == "Autres"
+    assert metadata["city"] == "Bois-Colombes"
+    assert metadata["remote_level"] == "Télétravail non autorisé"
+
+    assert parse_summary_metadata("Alternance Levallois-Perret Télétravail fréquent")["city"] == "Levallois-Perret"
+    assert parse_summary_metadata("Alternance Fontenay-sous-Bois Télétravail fréquent")["city"] == "Fontenay-sous-Bois"
+    assert parse_summary_metadata("Alternance Puteaux Télétravail fréquent")["city"] == "Puteaux"
+
+
+def test_parse_summary_metadata_filters_skill_noise():
+    summary = """
+    CDI
+    Boulogne-Billancourt
+    Télétravail non autorisé
+    Compétences & expertises
+    Communication
+    Communication
+    PostulerSauvegarderavant-hierPartagerCopier le lien
+    Postuler
+    Sauvegarder
+    """
+
+    metadata = parse_summary_metadata(summary)
+
+    assert metadata["skills_hard"] == ["Communication"]
+
+
+def test_parse_summary_metadata_filters_observed_skill_tail_noise():
+    summary = """
+    CDI
+    Paris
+    Télétravail fréquent
+    Compétences & expertises
+    Gestion des entretiensEfficacité opérationnelle
+    Gestion des entretiens
+    Efficacité opérationnelle
+    hier
+    La Banque Postale
+    Cette offre vous tente ?
+    """
+
+    metadata = parse_summary_metadata(summary)
+
+    assert metadata["skills_hard"] == ["Gestion des entretiens", "Efficacité opérationnelle"]
+
+
 @pytest.mark.asyncio
 async def test_scrape_detail_uses_detail_facts_for_wttj_header_metadata(base_listing):
     page = AsyncMock()
@@ -181,3 +250,72 @@ async def test_scrape_detail_uses_detail_facts_for_wttj_header_metadata(base_lis
     assert result.experience_label == "> 5 ans"
     assert result.education_level == "Bac +5"
     assert result.skills_hard == ["Gestion des entretiens", "Efficacité opérationnelle"]
+
+
+@pytest.mark.asyncio
+async def test_scrape_detail_clears_noisy_remote_when_no_clean_value(base_listing):
+    page = AsyncMock()
+    page.goto = AsyncMock()
+    page.wait_for_timeout = AsyncMock()
+    page.evaluate = AsyncMock(
+        return_value={
+            "page_title": "Alternance communication",
+            "text_preview": "",
+            "company_name": "EDF",
+            "contract_type": "Alternance",
+            "city": "Marseille",
+            "remote_level": '{ "@context": "https://schema.org", "@type": "FAQPage", "name": "Le télétravail est-il possible ?" }',
+            "company_sectors": [],
+            "facts_raw": ["Alternance", "Marseille", "Salaire :", "Non spécifié"],
+        }
+    )
+    page.close = AsyncMock()
+    context = AsyncMock()
+    context.new_page = AsyncMock(return_value=page)
+    listing = base_listing.model_copy(
+        update={
+            "snippet": "Alternance communication EDF Alternance Marseille avant-hier",
+        }
+    )
+
+    result = await scrape_detail(context, listing)
+
+    assert result.contract_type == "Alternance"
+    assert result.city == "Marseille"
+    assert result.remote_level is None
+
+
+@pytest.mark.asyncio
+async def test_scrape_detail_listing_summary_overrides_wrong_detail_contract(base_listing):
+    page = AsyncMock()
+    page.goto = AsyncMock()
+    page.wait_for_timeout = AsyncMock()
+    page.evaluate = AsyncMock(
+        return_value={
+            "page_title": "CDI - Assistant RH & Communication",
+            "text_preview": "Un contenu de page qui mentionne aussi stage et stages.",
+            "company_name": "Hermès",
+            "contract_type": "Stage",
+            "city": "Bourgoin-Jallieu",
+            "remote_level": '{ "@context": "https://schema.org", "@type": "FAQPage", "name": "Le télétravail est-il possible ?" }',
+            "company_sectors": [],
+            "facts_raw": ["Stage", "Bourgoin-Jallieu"],
+        }
+    )
+    page.close = AsyncMock()
+    context = AsyncMock()
+    context.new_page = AsyncMock(return_value=page)
+    listing = base_listing.model_copy(
+        update={
+            "snippet": (
+                "CDI - Assistant RH & Communication Hermès CDI Bourgoin-Jallieu "
+                "Salaire : Non spécifié il y a 16 heures"
+            ),
+        }
+    )
+
+    result = await scrape_detail(context, listing)
+
+    assert result.contract_type == "CDI"
+    assert result.city == "Bourgoin-Jallieu"
+    assert result.remote_level is None

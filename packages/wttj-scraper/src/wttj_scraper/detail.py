@@ -52,8 +52,72 @@ def _compact(text: str | None) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
 
+_CONTRACT_TYPES = ("Alternance", "Stage", "CDI", "CDD", "Freelance", "Internship", "Autres")
+_CITY_PATTERN = re.compile(
+    r"\b("
+    r"Paris|Lille|Lyon|Marseille|Bordeaux|Malakoff|Puteaux|Paluel|Colombes|"
+    r"Levallois-Perret|Neuilly-sur-Seine|Boulogne-Billancourt|Fontenay-sous-Bois|"
+    r"Wasquehal|Montreuil|Bois-Colombes|Bourgoin-Jallieu"
+    r")\b",
+    re.IGNORECASE,
+)
+_REMOTE_PATTERN = re.compile(
+    r"\b("
+    r"Télétravail\s+(?:fréquent|occasionnel|partiel|total|non\s+autorisé)|"
+    r"Teletravail\s+(?:frequent|occasionnel|partiel|total|non\s+autorise)|"
+    r"Remote\s+(?:friendly|possible|only|partiel|total)|"
+    r"Hybride"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
 def _summary_lines(summary: str | None) -> list[str]:
     return [_compact(line) for line in (summary or "").splitlines() if _compact(line)]
+
+
+def _is_noise_text(value: str) -> bool:
+    lowered = value.lower()
+    noisy_markers = (
+        "postuler",
+        "sauvegarder",
+        "partager",
+        "copier le lien",
+        "@context",
+        "schema.org",
+        "faqpage",
+        "acceptedanswer",
+    )
+    return any(marker in lowered for marker in noisy_markers)
+
+
+def _clean_skill_values(values: list[str]) -> list[str]:
+    candidates: list[str] = []
+    for value in values:
+        skill = _compact(value)
+        if not skill or _is_noise_text(skill):
+            continue
+        if re.fullmatch(r"(avant-hier|hier|aujourd'hui|il y a \d+ (?:heures?|jours?))", skill, re.IGNORECASE):
+            continue
+        if re.search(r"offre vous tente|voir toutes les offres", skill, re.IGNORECASE):
+            continue
+        if re.fullmatch(r"La Banque Postale|FDJ UNITED|EDF|Hermès|AXA", skill, re.IGNORECASE):
+            continue
+        if len(skill) > 60:
+            continue
+        candidates.append(skill)
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for skill in candidates:
+        if any(skill != other and other.casefold() in skill.casefold() for other in candidates):
+            continue
+        key = skill.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(skill)
+    return out
 
 
 def _value_after_label(lines: list[str], labels: tuple[str, ...]) -> str | None:
@@ -107,34 +171,26 @@ def parse_summary_metadata(summary: str | None) -> dict[str, object | None]:
         }
 
     contract_type = None
-    for candidate in ("Alternance", "Stage", "CDI", "CDD", "Freelance", "Internship"):
+    for candidate in _CONTRACT_TYPES:
         if re.search(rf"\b{re.escape(candidate)}\b", text, re.IGNORECASE):
             contract_type = candidate
             break
 
     remote_level = next(
         (
-            line
+            _REMOTE_PATTERN.search(line).group(1)
             for line in lines
-            if re.match(r"^(Télétravail|Teletravail|Remote|Hybride)\b", line, re.IGNORECASE)
+            if not _is_noise_text(line) and _REMOTE_PATTERN.search(line)
         ),
         None,
     )
     if remote_level is None:
-        remote_match = re.search(
-            r"(Télétravail(?:\s+[A-Za-zÀ-ÿ-]+){0,2}|Teletravail(?:\s+[A-Za-zÀ-ÿ-]+){0,2}|Remote(?:\s+[A-Za-zÀ-ÿ-]+){0,2})",
-            text,
-            re.IGNORECASE,
-        )
+        remote_match = _REMOTE_PATTERN.search(text)
         if remote_match:
             remote_level = _compact(remote_match.group(1))
 
     city = None
-    city_match = re.search(
-        r"\b(Paris|Lille|Lyon|Marseille|Bordeaux|Malakoff|Neuilly-sur-Seine|Boulogne-Billancourt|Wasquehal|Montreuil|Bois-Colombes)\b",
-        text,
-        re.IGNORECASE,
-    )
+    city_match = _CITY_PATTERN.search(text)
     if city_match:
         city = city_match.group(1)
 
@@ -157,18 +213,20 @@ def parse_summary_metadata(summary: str | None) -> dict[str, object | None]:
         education_match = re.search(r"(Bac\s*\+\s*\d)", education_label, re.IGNORECASE)
         education_level = education_match.group(1) if education_match else education_label
 
-    skills_hard = _values_after_label_until_next_section(
-        lines,
-        "Compétences & expertises",
-        (
-            "Questions et réponses sur l'offre",
-            "Le poste",
-            "Descriptif du poste",
-            "Profil recherché",
-            "L'entreprise",
-            "Les avantages salariés",
-            "Le lieu de travail",
-        ),
+    skills_hard = _clean_skill_values(
+        _values_after_label_until_next_section(
+            lines,
+            "Compétences & expertises",
+            (
+                "Questions et réponses sur l'offre",
+                "Le poste",
+                "Descriptif du poste",
+                "Profil recherché",
+                "L'entreprise",
+                "Les avantages salariés",
+                "Le lieu de travail",
+            ),
+        )
     )
 
     return {
@@ -264,13 +322,13 @@ def _is_noisy_metadata_value(key: str, value: object) -> bool:
         "education_level",
     }:
         return False
-    noisy_markers = ("Postuler", "Sauvegarder", "Partager", "Copier le lien")
-    return len(value) > 80 or any(marker.lower() in value.lower() for marker in noisy_markers)
+    return len(value) > 80 or _is_noise_text(value)
 
 
-def _apply_summary_metadata(details: dict, summary: str | None) -> None:
+def _apply_summary_metadata(details: dict, summary: str | None, *, prefer: bool = False) -> None:
     metadata = parse_summary_metadata(summary)
     has_salary_label = bool(metadata.get("salary_label"))
+    preferred_keys = {"contract_type", "remote_level", "date_posted_label", "salary_label"}
     for key, value in metadata.items():
         if key == "salary_visible":
             if has_salary_label and details.get(key) is None:
@@ -279,8 +337,27 @@ def _apply_summary_metadata(details: dict, summary: str | None) -> None:
         if value in (None, "", []):
             continue
         current_value = details.get(key)
-        if current_value in (None, "", []) or _is_noisy_metadata_value(key, current_value):
+        if current_value in (None, "", []) or _is_noisy_metadata_value(key, current_value) or (
+            prefer and key in preferred_keys
+        ):
             details[key] = value
+
+
+def _sanitize_metadata(details: dict) -> None:
+    for key in (
+        "contract_type",
+        "city",
+        "remote_level",
+        "date_posted_label",
+        "salary_label",
+        "start_date",
+        "experience_label",
+        "education_level",
+    ):
+        if _is_noisy_metadata_value(key, details.get(key)):
+            details[key] = None
+    if isinstance(details.get("skills_hard"), list):
+        details["skills_hard"] = _clean_skill_values([str(skill) for skill in details["skills_hard"]])
 
 
 async def scrape_detail(context: BrowserContext, job: JobListing) -> JobDetail:
@@ -296,8 +373,9 @@ async def scrape_detail(context: BrowserContext, job: JobListing) -> JobDetail:
         facts_raw = details.get("facts_raw") or []
         if isinstance(facts_raw, list):
             _apply_summary_metadata(details, "\n".join(str(fact) for fact in facts_raw))
-        _apply_summary_metadata(details, job.snippet)
+        _apply_summary_metadata(details, job.snippet, prefer=True)
         _apply_summary_metadata(details, details.get("text_preview"))
+        _sanitize_metadata(details)
         details["languages_required"] = details.get("languages_required") or _extract_languages(
             details.get("profile_raw"),
             details.get("missions_raw"),
