@@ -7,9 +7,16 @@ import streamlit as st
 HF_DATASET_REPO = os.getenv("HF_DATASET_REPO")
 DATA_PATH = os.getenv("DATA_PATH")
 
-_LOCAL_FALLBACK = Path(__file__).parents[4] / "data" / "jobs.csv"
-
 DISPLAY_COLS = ["title", "snippet", "scraped_at", "url"]
+
+
+def default_local_fallback() -> Path:
+    current = Path(__file__).resolve()
+    for parent in (current.parent, *current.parents):
+        candidate = parent / "data" / "jobs.csv"
+        if candidate.exists():
+            return candidate
+    return Path("data/jobs.csv")
 
 
 @st.cache_data(ttl=300)
@@ -25,7 +32,7 @@ def load_data() -> pd.DataFrame:
     elif DATA_PATH:
         path = DATA_PATH
     else:
-        path = _LOCAL_FALLBACK
+        path = default_local_fallback()
 
     return pd.read_csv(path, parse_dates=["scraped_at"])
 
