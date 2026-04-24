@@ -15,6 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate HF secrets
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_REPO: ${{ secrets.HF_SPACE_REPO }}
+        run: |
+          test -n "$HF_TOKEN" || (echo "::error::Missing GitHub secret HF_TOKEN" && exit 1)
+          test -n "$HF_SPACE_REPO" || (echo "::error::Missing GitHub secret HF_SPACE_REPO" && exit 1)
+
       - name: Push app to HF Spaces
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
