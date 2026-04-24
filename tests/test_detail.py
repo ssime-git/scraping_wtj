@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock
 from wttj_models.job import JobDetail, JobListing
-from wttj_scraper.detail import scrape_detail
+from wttj_scraper.detail import parse_summary_metadata, scrape_detail
 
 
 @pytest.fixture
@@ -84,3 +84,16 @@ async def test_scrape_detail_closes_page_on_error(mock_context_detail, mock_deta
     result = await scrape_detail(mock_context_detail, base_listing)
     mock_detail_page.close.assert_awaited_once()
     assert result.error is not None
+
+
+def test_parse_summary_metadata_extracts_atomic_fields():
+    summary = (
+        "Groupe SII Alternance Assistant communication H/F Siege Alternance Paris "
+        "Teletravail non autorise Salaire : Non specifie Education : Bac +5 / Master "
+        "avant-hier"
+    )
+    metadata = parse_summary_metadata(summary)
+    assert metadata["contract_type"] == "Alternance"
+    assert metadata["city"] == "Paris"
+    assert metadata["remote_level"] == "Teletravail non autorise"
+    assert metadata["date_posted_label"] == "avant-hier"

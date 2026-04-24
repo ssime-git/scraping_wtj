@@ -37,10 +37,17 @@ async def scrape_listing(
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
         await page.wait_for_timeout(2_500)
-        for _ in range(scroll_count):
+        for _ in range(max(scroll_count, 1)):
             await page.mouse.wheel(0, 3_000)
             await page.wait_for_timeout(1_500)
         raw: list[dict] = await page.evaluate(_EXTRACT_JS, max_jobs)
+        while len(raw) < max_jobs:
+            await page.mouse.wheel(0, 3_000)
+            await page.wait_for_timeout(1_500)
+            new_raw: list[dict] = await page.evaluate(_EXTRACT_JS, max_jobs)
+            if len(new_raw) == len(raw):
+                break
+            raw = new_raw
         return [JobListing(**item) for item in raw]
     finally:
         await page.close()

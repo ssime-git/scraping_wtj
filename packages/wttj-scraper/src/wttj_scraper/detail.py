@@ -52,6 +52,57 @@ def _compact(text: str | None) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
 
+def parse_summary_metadata(summary: str | None) -> dict[str, str | None]:
+    text = _compact(summary)
+    if not text:
+        return {
+            "city": None,
+            "contract_type": None,
+            "remote_level": None,
+            "date_posted_label": None,
+        }
+
+    contract_type = None
+    for candidate in ("Alternance", "Stage", "CDI", "CDD", "Freelance", "Internship"):
+        if re.search(rf"\b{re.escape(candidate)}\b", text, re.IGNORECASE):
+            contract_type = candidate
+            break
+
+    remote_level = None
+    remote_match = re.search(
+        r"(Télétravail(?:\s+[A-Za-zÀ-ÿ-]+){0,2}|Teletravail(?:\s+[A-Za-zÀ-ÿ-]+){0,2}|Remote(?:\s+[A-Za-zÀ-ÿ-]+){0,2})",
+        text,
+        re.IGNORECASE,
+    )
+    if remote_match:
+        remote_level = _compact(remote_match.group(1))
+
+    city = None
+    city_match = re.search(
+        r"\b(Paris|Lille|Lyon|Marseille|Bordeaux|Malakoff|Neuilly-sur-Seine|Boulogne-Billancourt|Wasquehal|Montreuil|Bois-Colombes)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if city_match:
+        city = city_match.group(1)
+
+    date_posted_label = None
+    date_match = re.search(
+        r"\b(avant-hier|hier|aujourd'hui|today|last month|le mois dernier|il y a \d+ heures?|il y a \d+ jours?)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if date_match:
+        date_posted_label = _compact(date_match.group(1))
+
+    return {
+        "city": city,
+        "contract_type": contract_type,
+        "remote_level": remote_level,
+        "date_posted_label": date_posted_label,
+    }
+
+
 def _extract_languages(*texts: str | None) -> list[str]:
     haystack = " ".join(_compact(text).lower() for text in texts if text)
     found = []
@@ -127,6 +178,10 @@ async def scrape_detail(context: BrowserContext, job: JobListing) -> JobDetail:
         details["job_url"] = job.url
         details["job_id"] = job.url.rstrip("/").rsplit("/", 1)[-1]
         details["company_sectors"] = details.get("company_sectors") or []
+        summary_metadata = parse_summary_metadata(job.snippet)
+        for key, value in summary_metadata.items():
+            if details.get(key) in (None, "", []):
+                details[key] = value
         details["languages_required"] = details.get("languages_required") or _extract_languages(
             details.get("profile_raw"),
             details.get("missions_raw"),

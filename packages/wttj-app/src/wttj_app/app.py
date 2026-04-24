@@ -19,6 +19,10 @@ DISPLAY_COLS = [
 ]
 
 
+def get_default_visible_columns(columns: list[str]) -> list[str]:
+    return columns
+
+
 def check_credentials(username: str, password: str) -> bool:
     expected_user = os.getenv("APP_USERNAME")
     expected_password = os.getenv("APP_PASSWORD")
@@ -116,7 +120,9 @@ def main() -> None:
     st.divider()
     st.caption(f"{len(df)} offer(s) shown")
 
-    visible_cols = [col for col in DISPLAY_COLS if col in df.columns]
+    default_cols = get_default_visible_columns(list(df.columns))
+    selected_cols = st.multiselect("Visible columns", list(df.columns), default=default_cols)
+    visible_cols = selected_cols or default_cols
     st.dataframe(
         df[visible_cols],
         column_config={

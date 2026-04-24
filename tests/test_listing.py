@@ -55,14 +55,35 @@ async def test_scrape_listing_navigates_and_scrolls(mock_context_with_jobs, mock
     mock_page_with_jobs.goto.assert_awaited_once_with(
         url, wait_until="domcontentloaded", timeout=60_000
     )
-    mock_page_with_jobs.mouse.wheel.assert_awaited_once_with(0, 3_000)
+    assert mock_page_with_jobs.mouse.wheel.await_count >= 1
 
 
 @pytest.mark.asyncio
 async def test_scrape_listing_scroll_count(mock_context_with_jobs, mock_page_with_jobs):
     url = "https://www.welcometothejungle.com/fr/jobs"
     await scrape_listing(mock_context_with_jobs, url, scroll_count=3)
-    assert mock_page_with_jobs.mouse.wheel.await_count == 3
+    assert mock_page_with_jobs.mouse.wheel.await_count >= 3
+
+
+@pytest.mark.asyncio
+async def test_scrape_listing_scrolls_until_results_stabilize(mock_context_with_jobs, mock_page_with_jobs):
+    mock_page_with_jobs.evaluate = AsyncMock(
+        side_effect=[
+            [{"title": "A", "url": "https://example.com/a", "snippet": "A"}],
+            [
+                {"title": "A", "url": "https://example.com/a", "snippet": "A"},
+                {"title": "B", "url": "https://example.com/b", "snippet": "B"},
+            ],
+            [
+                {"title": "A", "url": "https://example.com/a", "snippet": "A"},
+                {"title": "B", "url": "https://example.com/b", "snippet": "B"},
+            ],
+        ]
+    )
+    url = "https://www.welcometothejungle.com/fr/jobs"
+    results = await scrape_listing(mock_context_with_jobs, url, max_jobs=10, scroll_count=1)
+    assert len(results) == 2
+    assert mock_page_with_jobs.evaluate.await_count == 3
 
 
 @pytest.mark.asyncio
