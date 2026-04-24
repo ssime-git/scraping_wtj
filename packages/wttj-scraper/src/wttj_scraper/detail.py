@@ -52,14 +52,58 @@ def _compact(text: str | None) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
 
 
-def parse_summary_metadata(summary: str | None) -> dict[str, str | None]:
+def _summary_lines(summary: str | None) -> list[str]:
+    return [_compact(line) for line in (summary or "").splitlines() if _compact(line)]
+
+
+def _value_after_label(lines: list[str], labels: tuple[str, ...]) -> str | None:
+    label_set = {label.lower().rstrip(":") for label in labels}
+    for index, line in enumerate(lines):
+        normalized = line.lower().rstrip(":").strip()
+        if normalized in label_set and index + 1 < len(lines):
+            return lines[index + 1]
+        for label in label_set:
+            prefix = f"{label} :"
+            if line.lower().startswith(prefix):
+                value = _compact(line[len(prefix) :])
+                return value or (lines[index + 1] if index + 1 < len(lines) else None)
+    return None
+
+
+def _values_after_label_until_next_section(
+    lines: list[str], label: str, stop_labels: tuple[str, ...]
+) -> list[str]:
+    label_normalized = label.lower().rstrip(":")
+    stop_set = {stop.lower().rstrip(":") for stop in stop_labels}
+    values: list[str] = []
+    collecting = False
+    for line in lines:
+        normalized = line.lower().rstrip(":").strip()
+        if normalized == label_normalized:
+            collecting = True
+            continue
+        if collecting and normalized in stop_set:
+            break
+        if collecting:
+            values.append(line)
+    return values
+
+
+def parse_summary_metadata(summary: str | None) -> dict[str, object | None]:
     text = _compact(summary)
+    lines = _summary_lines(summary)
     if not text:
         return {
             "city": None,
             "contract_type": None,
             "remote_level": None,
             "date_posted_label": None,
+            "salary_label": None,
+            "salary_visible": False,
+            "start_date": None,
+            "experience_label": None,
+            "education_level": None,
+            "skills_hard": [],
         }
 
     contract_type = None
@@ -68,14 +112,22 @@ def parse_summary_metadata(summary: str | None) -> dict[str, str | None]:
             contract_type = candidate
             break
 
-    remote_level = None
-    remote_match = re.search(
-        r"(Télétravail(?:\s+[A-Za-zÀ-ÿ-]+){0,2}|Teletravail(?:\s+[A-Za-zÀ-ÿ-]+){0,2}|Remote(?:\s+[A-Za-zÀ-ÿ-]+){0,2})",
-        text,
-        re.IGNORECASE,
+    remote_level = next(
+        (
+            line
+            for line in lines
+            if re.match(r"^(Télétravail|Teletravail|Remote|Hybride)\b", line, re.IGNORECASE)
+        ),
+        None,
     )
-    if remote_match:
-        remote_level = _compact(remote_match.group(1))
+    if remote_level is None:
+        remote_match = re.search(
+            r"(Télétravail(?:\s+[A-Za-zÀ-ÿ-]+){0,2}|Teletravail(?:\s+[A-Za-zÀ-ÿ-]+){0,2}|Remote(?:\s+[A-Za-zÀ-ÿ-]+){0,2})",
+            text,
+            re.IGNORECASE,
+        )
+        if remote_match:
+            remote_level = _compact(remote_match.group(1))
 
     city = None
     city_match = re.search(
@@ -95,11 +147,41 @@ def parse_summary_metadata(summary: str | None) -> dict[str, str | None]:
     if date_match:
         date_posted_label = _compact(date_match.group(1))
 
+    salary_label = _value_after_label(lines, ("Salaire", "Salary"))
+    salary_visible = bool(salary_label and not re.search(r"non spécifié|non specifie", salary_label, re.IGNORECASE))
+    start_date = _value_after_label(lines, ("Début", "Debut", "Start date"))
+    experience_label = _value_after_label(lines, ("Expérience", "Experience"))
+    education_label = _value_after_label(lines, ("Éducation", "Education"))
+    education_level = None
+    if education_label:
+        education_match = re.search(r"(Bac\s*\+\s*\d)", education_label, re.IGNORECASE)
+        education_level = education_match.group(1) if education_match else education_label
+
+    skills_hard = _values_after_label_until_next_section(
+        lines,
+        "Compétences & expertises",
+        (
+            "Questions et réponses sur l'offre",
+            "Le poste",
+            "Descriptif du poste",
+            "Profil recherché",
+            "L'entreprise",
+            "Les avantages salariés",
+            "Le lieu de travail",
+        ),
+    )
+
     return {
         "city": city,
         "contract_type": contract_type,
         "remote_level": remote_level,
         "date_posted_label": date_posted_label,
+        "salary_label": salary_label,
+        "salary_visible": salary_visible,
+        "start_date": start_date,
+        "experience_label": experience_label,
+        "education_level": education_level,
+        "skills_hard": skills_hard,
     }
 
 
@@ -168,6 +250,39 @@ def _extract_experience_months(*texts: str | None) -> tuple[int | None, int | No
     return min(matches), max(matches)
 
 
+def _is_noisy_metadata_value(key: str, value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    if key not in {
+        "contract_type",
+        "city",
+        "remote_level",
+        "date_posted_label",
+        "salary_label",
+        "start_date",
+        "experience_label",
+        "education_level",
+    }:
+        return False
+    noisy_markers = ("Postuler", "Sauvegarder", "Partager", "Copier le lien")
+    return len(value) > 80 or any(marker.lower() in value.lower() for marker in noisy_markers)
+
+
+def _apply_summary_metadata(details: dict, summary: str | None) -> None:
+    metadata = parse_summary_metadata(summary)
+    has_salary_label = bool(metadata.get("salary_label"))
+    for key, value in metadata.items():
+        if key == "salary_visible":
+            if has_salary_label and details.get(key) is None:
+                details[key] = value
+            continue
+        if value in (None, "", []):
+            continue
+        current_value = details.get(key)
+        if current_value in (None, "", []) or _is_noisy_metadata_value(key, current_value):
+            details[key] = value
+
+
 async def scrape_detail(context: BrowserContext, job: JobListing) -> JobDetail:
     page = await context.new_page()
     try:
@@ -178,10 +293,11 @@ async def scrape_detail(context: BrowserContext, job: JobListing) -> JobDetail:
         details["job_url"] = job.url
         details["job_id"] = job.url.rstrip("/").rsplit("/", 1)[-1]
         details["company_sectors"] = details.get("company_sectors") or []
-        summary_metadata = parse_summary_metadata(job.snippet)
-        for key, value in summary_metadata.items():
-            if details.get(key) in (None, "", []):
-                details[key] = value
+        facts_raw = details.get("facts_raw") or []
+        if isinstance(facts_raw, list):
+            _apply_summary_metadata(details, "\n".join(str(fact) for fact in facts_raw))
+        _apply_summary_metadata(details, job.snippet)
+        _apply_summary_metadata(details, details.get("text_preview"))
         details["languages_required"] = details.get("languages_required") or _extract_languages(
             details.get("profile_raw"),
             details.get("missions_raw"),

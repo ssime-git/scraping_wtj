@@ -97,3 +97,87 @@ def test_parse_summary_metadata_extracts_atomic_fields():
     assert metadata["city"] == "Paris"
     assert metadata["remote_level"] == "Teletravail non autorise"
     assert metadata["date_posted_label"] == "avant-hier"
+
+
+def test_parse_summary_metadata_extracts_wttj_header_facts():
+    summary = """
+    Chargé(e) de communication RSE/Événementiel H/F
+    Résumé du poste
+    CDI
+    Paris
+    Télétravail fréquent
+    Salaire :
+    Non spécifié
+    Début :
+    23 avril 2026
+    Expérience :
+    > 5 ans
+    Éducation :
+    Bac +5 / Master
+    Compétences & expertises
+    Gestion des entretiens
+    Efficacité opérationnelle
+    """
+
+    metadata = parse_summary_metadata(summary)
+
+    assert metadata["contract_type"] == "CDI"
+    assert metadata["city"] == "Paris"
+    assert metadata["remote_level"] == "Télétravail fréquent"
+    assert metadata["salary_label"] == "Non spécifié"
+    assert metadata["salary_visible"] is False
+    assert metadata["start_date"] == "23 avril 2026"
+    assert metadata["experience_label"] == "> 5 ans"
+    assert metadata["education_level"] == "Bac +5"
+    assert metadata["skills_hard"] == ["Gestion des entretiens", "Efficacité opérationnelle"]
+
+
+@pytest.mark.asyncio
+async def test_scrape_detail_uses_detail_facts_for_wttj_header_metadata(base_listing):
+    page = AsyncMock()
+    page.goto = AsyncMock()
+    page.wait_for_timeout = AsyncMock()
+    page.evaluate = AsyncMock(
+        return_value={
+            "page_title": "Chargé(e) de communication RSE/Événementiel H/F",
+            "text_preview": "",
+            "company_name": "La Banque Postale",
+            "contract_type": "Entreprise CDI Paris Télétravail fréquent Salaire : Non spécifié Postuler Sauvegarder",
+            "city": "Entreprise CDI Paris Télétravail fréquent Salaire : Non spécifié Postuler Sauvegarder",
+            "remote_level": "Entreprise CDI Paris Télétravail fréquent Salaire : Non spécifié Postuler Sauvegarder",
+            "company_sectors": [],
+            "facts_raw": [
+                "Résumé du poste",
+                "CDI",
+                "Paris",
+                "Télétravail fréquent",
+                "Salaire :",
+                "Non spécifié",
+                "Début :",
+                "23 avril 2026",
+                "Expérience :",
+                "> 5 ans",
+                "Éducation :",
+                "Bac +5 / Master",
+                "Compétences & expertises",
+                "Gestion des entretiens",
+                "Efficacité opérationnelle",
+            ],
+        }
+    )
+    page.close = AsyncMock()
+    context = AsyncMock()
+    context.new_page = AsyncMock(return_value=page)
+    listing = base_listing.model_copy(update={"snippet": None})
+
+    result = await scrape_detail(context, listing)
+
+    assert result.contract_type == "CDI"
+    assert result.city == "Paris"
+    assert result.remote_level == "Télétravail fréquent"
+    assert result.salary_label == "Non spécifié"
+    assert result.salary_visible is False
+    assert result.start_date == "23 avril 2026"
+    assert result.experience_label == "> 5 ans"
+    assert result.education_level == "Bac +5"
+    assert result.skills_hard == ["Gestion des entretiens", "Efficacité opérationnelle"]
