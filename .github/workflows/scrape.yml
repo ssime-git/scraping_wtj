@@ -31,7 +31,7 @@ jobs:
           HF_DATASET_REPO: ${{ secrets.HF_DATASET_REPO }}
         run: |
           mkdir -p data
-          uv run python - <<'PY'
+          uv run --package wttj-scraper --extra hf python - <<'PY'
           import os
           import shutil
 
