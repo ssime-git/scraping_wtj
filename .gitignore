@@ -1,4 +1,6 @@
 .venv/
 __pycache__/
 *.pyc
+.codex
 data/*.csv
+data/seen_urls.txt

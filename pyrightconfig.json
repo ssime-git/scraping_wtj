@@ -6,6 +6,7 @@
   "extraPaths": [
     "packages/wttj-models/src",
     "packages/wttj-scraper/src",
-    "packages/wttj-cli/src"
+    "packages/wttj-cli/src",
+    "packages/wttj-app/src"
   ]
 }

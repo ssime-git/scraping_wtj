@@ -1,5 +1,6 @@
 import asyncio
 import csv
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,7 +13,7 @@ SCROLL_COUNT = 3
 MAX_JOBS = 60
 ENRICH_COUNT = 10
 
-DATA_DIR = Path(__file__).parent.parent / "data"
+DATA_DIR = Path(os.getenv("DATA_DIR", str(Path(__file__).parent.parent / "data")))
 CSV_FILE = DATA_DIR / "jobs.csv"
 SEEN_URLS_FILE = DATA_DIR / "seen_urls.txt"
 
@@ -38,6 +39,27 @@ def append_to_csv(rows: list[dict]) -> None:
         if write_header:
             writer.writeheader()
         writer.writerows(rows)
+
+
+def push_to_hf() -> None:
+    from huggingface_hub import HfApi
+
+    api = HfApi(token=os.environ["HF_TOKEN"])
+    repo_id = os.environ["HF_DATASET_REPO"]
+    api.upload_file(
+        path_or_fileobj=str(CSV_FILE),
+        path_in_repo="jobs.csv",
+        repo_id=repo_id,
+        repo_type="dataset",
+    )
+    if SEEN_URLS_FILE.exists():
+        api.upload_file(
+            path_or_fileobj=str(SEEN_URLS_FILE),
+            path_in_repo="seen_urls.txt",
+            repo_id=repo_id,
+            repo_type="dataset",
+        )
+    print(f"Pushed to HF Dataset: {repo_id}")
 
 
 async def main() -> None:
@@ -72,6 +94,9 @@ async def main() -> None:
 
     print(f"Saved {len(rows)} new jobs → {CSV_FILE}")
     print(f"Total seen URLs: {len(seen_urls) + len(rows)}")
+
+    if os.getenv("HF_TOKEN") and os.getenv("HF_DATASET_REPO"):
+        push_to_hf()
 
 
 if __name__ == "__main__":

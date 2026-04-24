@@ -6,6 +6,7 @@ dev-dependencies = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "pytest-playwright>=0.5",
+    "huggingface_hub>=0.22",
 ]
 
 [tool.pytest.ini_options]

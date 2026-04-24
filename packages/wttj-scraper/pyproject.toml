@@ -7,6 +7,9 @@ dependencies = [
     "wttj-models",
 ]
 
+[project.optional-dependencies]
+hf = ["huggingface_hub>=0.22"]
+
 [tool.uv.sources]
 wttj-models = { workspace = true }
 

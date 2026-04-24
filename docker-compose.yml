@@ -1,0 +1,27 @@
+services:
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    volumes:
+      - data:/data
+    environment:
+      DATA_DIR: /data
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_DATASET_REPO: ${HF_DATASET_REPO:-}
+    profiles:
+      - scrape
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    ports:
+      - "8501:8501"
+    volumes:
+      - data:/data
+    environment:
+      DATA_PATH: /data/jobs.csv
+
+volumes:
+  data:

@@ -1,0 +1,43 @@
+name: Deploy to HF Spaces
+
+on:
+  push:
+    paths:
+      - "packages/wttj-app/**"
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push app to HF Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_REPO: ${{ secrets.HF_SPACE_REPO }}
+        run: |
+          pip install huggingface_hub
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo_id = os.environ["HF_SPACE_REPO"]
+
+          files = {
+              "packages/wttj-app/src/wttj_app/app.py": "app.py",
+              "packages/wttj-app/requirements.txt": "requirements.txt",
+              "packages/wttj-app/README.md": "README.md",
+          }
+          for local, remote in files.items():
+              api.upload_file(
+                  path_or_fileobj=local,
+                  path_in_repo=remote,
+                  repo_id=repo_id,
+                  repo_type="space",
+              )
+          print(f"Deployed to HF Space: {repo_id}")
+          EOF

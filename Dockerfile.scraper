@@ -1,0 +1,21 @@
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+WORKDIR /app
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+# Copy workspace config + only the packages we need
+COPY pyproject.toml uv.lock ./
+COPY packages/wttj-models ./packages/wttj-models
+COPY packages/wttj-scraper ./packages/wttj-scraper
+
+# Install scraper + huggingface_hub optional extra
+RUN uv sync --package wttj-scraper --extra hf --frozen --no-dev
+
+# Install Playwright Chromium + OS deps
+RUN uv run playwright install chromium --with-deps
+
+COPY scripts ./scripts
+
+CMD ["uv", "run", "python", "scripts/scrape_to_csv.py"]
