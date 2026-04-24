@@ -1,5 +1,4 @@
 import json
-import pytest
 from unittest.mock import patch
 from datetime import datetime, timezone
 from wttj_models.job import JobDetail, ScrapeResult
@@ -31,7 +30,7 @@ def test_main_outputs_json(capsys):
     assert data["jobs"][0]["title"] == "Dev Python"
 
 
-def test_main_uses_defaults(capsys):
+def test_main_uses_defaults():
     with patch("wttj_cli.main.asyncio.run", return_value=_MOCK_RESULT) as mock_run:
         from wttj_cli.main import main
         main([])
