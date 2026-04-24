@@ -151,7 +151,9 @@ async def scrape_detail(context: BrowserContext, job: JobListing) -> JobDetail:
                 details.get("profile_raw"),
                 details.get("text_preview"),
             )
-        return JobDetail(**job.model_dump(), **details)
+        payload = job.model_dump()
+        payload.update(details)
+        return JobDetail(**payload)
     except Exception as exc:
         return JobDetail(**job.model_dump(), error=str(exc))
     finally:
