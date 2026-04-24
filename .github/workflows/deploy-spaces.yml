@@ -5,6 +5,7 @@ on:
     paths:
       - "packages/wttj-app/**"
     branches:
+      - master
       - main
   workflow_dispatch:
 
@@ -28,6 +29,7 @@ jobs:
           repo_id = os.environ["HF_SPACE_REPO"]
 
           files = {
+              "packages/wttj-app/space/Dockerfile": "Dockerfile",
               "packages/wttj-app/src/wttj_app/app.py": "app.py",
               "packages/wttj-app/requirements.txt": "requirements.txt",
               "packages/wttj-app/README.md": "README.md",
