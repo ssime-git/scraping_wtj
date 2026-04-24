@@ -31,7 +31,7 @@ jobs:
           HF_DATASET_REPO: ${{ secrets.HF_DATASET_REPO }}
         run: |
           mkdir -p data
-          python - <<'PY'
+          uv run python - <<'PY'
           import os
           import shutil
 
