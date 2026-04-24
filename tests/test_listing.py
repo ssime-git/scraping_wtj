@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from wttj_models.job import JobListing
 from wttj_scraper.listing import scrape_listing
 
