@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class JobListing(BaseModel):
@@ -18,4 +18,4 @@ class ScrapeResult(BaseModel):
     source: str
     count: int
     jobs: list[JobDetail]
-    scraped_at: datetime = datetime.now(timezone.utc)
+    scraped_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
