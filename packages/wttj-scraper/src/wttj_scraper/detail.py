@@ -28,8 +28,12 @@ _EXTRACT_JS = """
         null;
     const findFact = (patterns) =>
         factTexts.find((text) => patterns.some((pattern) => text.toLowerCase().includes(pattern))) || null;
+    const primaryHeading =
+        normalize(document.querySelector('h1, h2')?.textContent) ||
+        normalize(document.title.split(' - ')[0]) ||
+        null;
     return {
-        page_title: normalize(document.querySelector('h1')?.textContent) || null,
+        page_title: primaryHeading,
         text_preview: normalize(document.body.innerText).slice(0, 3000),
         company_name: companyName,
         contract_type: findFact(['cdi', 'cdd', 'alternance', 'stage', 'freelance', 'internship']),
@@ -55,7 +59,7 @@ def _compact(text: str | None) -> str:
 _CONTRACT_TYPES = ("Alternance", "Stage", "CDI", "CDD", "Freelance", "Internship", "Autres")
 _CITY_PATTERN = re.compile(
     r"\b("
-    r"Paris|Lille|Lyon|Marseille|Bordeaux|Malakoff|Puteaux|Paluel|Colombes|"
+    r"Paris|Lille|Lyon|Marseille|Bordeaux|Grenoble|Malakoff|Puteaux|Paluel|Colombes|"
     r"Levallois-Perret|Neuilly-sur-Seine|Boulogne-Billancourt|Fontenay-sous-Bois|"
     r"Wasquehal|Montreuil|Bois-Colombes|Bourgoin-Jallieu"
     r")\b",

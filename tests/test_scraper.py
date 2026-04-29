@@ -69,3 +69,41 @@ async def test_scrape_limits_enrich_count():
         result = await scrape(_LISTING_URL, max_jobs=30, enrich_count=1)
 
     assert result.count == 1
+
+
+@pytest.mark.asyncio
+async def test_scrape_authenticated_matches_uses_browser_context_and_orchestrator():
+    loaded_config = object()
+    entered_context = object()
+    logger = object()
+    expected_result = ScrapeResult(
+        source="https://example.test/matches",
+        count=1,
+        jobs=[
+            JobDetail(
+                title="A",
+                url="https://example.com/1",
+                snippet="a",
+            )
+        ],
+    )
+    mock_run_authenticated_matches = AsyncMock(return_value=expected_result)
+    with (
+        patch("wttj_scraper.browser_context") as mock_bctx,
+        patch("wttj_scraper.load_matches_config") as mock_load,
+        patch("wttj_scraper.configure_logger", return_value=logger),
+        patch("wttj_scraper.run_authenticated_matches", mock_run_authenticated_matches),
+    ):
+        mock_load.return_value = loaded_config
+        mock_bctx.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
+        mock_bctx.return_value.__aexit__ = AsyncMock(return_value=None)
+        mock_bctx.return_value.__aenter__.return_value = entered_context
+        from wttj_scraper import scrape_authenticated_matches
+
+        result = await scrape_authenticated_matches("config/wttj_matches.yaml")
+
+    mock_load.assert_called_once_with("config/wttj_matches.yaml")
+    mock_bctx.assert_called_once_with()
+    mock_bctx.return_value.__aenter__.assert_awaited_once()
+    mock_run_authenticated_matches.assert_awaited_once_with(entered_context, loaded_config, logger)
+    assert result == expected_result

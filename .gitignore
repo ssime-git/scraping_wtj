@@ -2,5 +2,10 @@
 __pycache__/
 *.pyc
 .codex
+.worktrees/
 data/*.csv
+data/*.parquet
 data/seen_urls.txt
+.env
+.superpowers/
+docs/superpowers/

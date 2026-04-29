@@ -15,5 +15,11 @@ def test_requires_auth_before_data_load(monkeypatch):
 def test_all_columns_are_visible_by_default():
     from wttj_app.app import get_default_visible_columns
 
-    columns = ["job_title", "company_name", "city", "description_raw"]
-    assert get_default_visible_columns(columns) == columns
+    columns = ["description_raw", "job_title", "company_name", "city", "role_family"]
+    assert get_default_visible_columns(columns) == [
+        "role_family",
+        "job_title",
+        "company_name",
+        "city",
+        "description_raw",
+    ]

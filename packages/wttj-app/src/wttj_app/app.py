@@ -9,18 +9,24 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 DATA_PATH = os.getenv("DATA_PATH")
 
 DISPLAY_COLS = [
+    "role_family",
+    "matched_role_query",
     "job_title",
     "company_name",
     "city",
     "contract_type",
     "remote_level",
+    "salary_label",
+    "experience_label",
     "date_posted_label",
     "job_url",
 ]
 
 
 def get_default_visible_columns(columns: list[str]) -> list[str]:
-    return columns
+    preferred = [column for column in DISPLAY_COLS if column in columns]
+    remaining = [column for column in columns if column not in preferred]
+    return [*preferred, *remaining]
 
 
 def check_credentials(username: str, password: str) -> bool:
@@ -108,6 +114,36 @@ def main() -> None:
             | df.get("city", pd.Series(dtype=str)).fillna("").str.contains(query, case=False)
         )
         df = df[mask]
+
+    filter_columns = st.columns(4)
+    if "role_family" in df.columns:
+        selected_families = filter_columns[0].multiselect(
+            "Role families",
+            sorted(df["role_family"].dropna().unique()),
+        )
+        if selected_families:
+            df = df[df["role_family"].isin(selected_families)]
+    if "contract_type" in df.columns:
+        selected_contracts = filter_columns[1].multiselect(
+            "Contracts",
+            sorted(df["contract_type"].dropna().unique()),
+        )
+        if selected_contracts:
+            df = df[df["contract_type"].isin(selected_contracts)]
+    if "remote_level" in df.columns:
+        selected_remote = filter_columns[2].multiselect(
+            "Remote",
+            sorted(df["remote_level"].dropna().unique()),
+        )
+        if selected_remote:
+            df = df[df["remote_level"].isin(selected_remote)]
+    if "city" in df.columns:
+        selected_cities = filter_columns[3].multiselect(
+            "Cities",
+            sorted(df["city"].dropna().unique()),
+        )
+        if selected_cities:
+            df = df[df["city"].isin(selected_cities)]
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Total offers", len(df))

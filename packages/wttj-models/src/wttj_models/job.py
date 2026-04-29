@@ -8,6 +8,8 @@ class JobListing(BaseModel):
     snippet: str | None
     source_category: str | None = None
     location_label: str | None = None
+    role_family: str | None = None
+    matched_role_query: str | None = None
 
 
 class JobDetail(JobListing):
