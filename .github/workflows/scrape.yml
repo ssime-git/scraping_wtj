@@ -62,11 +62,27 @@ jobs:
         run: uv run playwright install chromium --with-deps
 
       - name: Run scraper
+        id: scrape
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_DATASET_REPO: ${{ secrets.HF_DATASET_REPO }}
           WTTJ_EMAIL: ${{ secrets.WTTJ_EMAIL }}
           WTTJ_PASSWORD: ${{ secrets.WTTJ_PASSWORD }}
           WTTJ_MATCHES_CONFIG: config/wttj_matches.yaml
           DATA_DIR: data
+          WTTJ_DEBUG_DIR: artifacts/wttj-debug
         run: uv run python scripts/scrape_matches_to_parquet.py
+
+      - name: Upload WTTJ debug artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wttj-debug-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: ignore
+
+      - name: Upload parquet to HF Dataset
+        if: success()
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_DATASET_REPO: ${{ secrets.HF_DATASET_REPO }}
+          DATA_DIR: data
+        run: uv run --package wttj-scraper --extra hf python scripts/upload_parquet_to_hf.py

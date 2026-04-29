@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+from pathlib import Path
 from urllib.parse import urlparse
 
 from playwright.async_api import BrowserContext, Page, TimeoutError as PlaywrightTimeoutError
@@ -18,6 +20,35 @@ async def _dismiss_cookie_overlay(page: Page) -> None:
         if await button.count():
             await button.click(timeout=5_000)
             break
+
+
+async def _write_debug_artifacts(page: Page, logger: logging.Logger) -> None:
+    debug_dir = os.getenv("WTTJ_DEBUG_DIR")
+    if not debug_dir:
+        return
+    target = Path(debug_dir)
+    target.mkdir(parents=True, exist_ok=True)
+    try:
+        screenshot_path = target / "login_failure.png"
+        html_path = target / "login_failure.html"
+        text_path = target / "login_failure.txt"
+        metadata_path = target / "login_failure_meta.txt"
+        await page.screenshot(path=str(screenshot_path), full_page=True)
+        html_path.write_text(await page.content(), encoding="utf-8")
+        body_text = await page.locator("body").inner_text()
+        text_path.write_text(body_text, encoding="utf-8")
+        metadata_path.write_text(
+            "\n".join(
+                [
+                    f"url={page.url}",
+                    f"title={await page.title()}",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        logger.warning("Wrote WTTJ debug artifacts to %s", target)
+    except Exception as exc:
+        logger.warning("Failed to write WTTJ debug artifacts: %s", exc)
 
 
 async def login_to_matches(
@@ -46,6 +77,7 @@ async def login_to_matches(
         await page.goto(matches_url, wait_until="domcontentloaded", timeout=120_000)
         await page.locator('input[name="futureRole"]').first.wait_for(state="visible", timeout=120_000)
     except PlaywrightTimeoutError as exc:
+        await _write_debug_artifacts(page, logger)
         await page.close()
         raise RuntimeError(f"Login did not reach jobs-matches: {matches_url}") from exc
     await _dismiss_cookie_overlay(page)

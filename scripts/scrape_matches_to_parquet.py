@@ -11,20 +11,6 @@ PARQUET_FILE = DATA_DIR / "jobs.parquet"
 CONFIG_PATH = os.getenv("WTTJ_MATCHES_CONFIG", "config/wttj_matches.yaml")
 
 
-def push_to_hf(path: Path) -> None:
-    from huggingface_hub import HfApi
-
-    api = HfApi(token=os.environ["HF_TOKEN"])
-    repo_id = os.environ["HF_DATASET_REPO"]
-    api.upload_file(
-        path_or_fileobj=str(path),
-        path_in_repo="jobs.parquet",
-        repo_id=repo_id,
-        repo_type="dataset",
-    )
-    print(f"Pushed parquet to HF Dataset: {repo_id}")
-
-
 async def main() -> None:
     DATA_DIR.mkdir(exist_ok=True)
     result = await scrape_authenticated_matches(CONFIG_PATH)
@@ -48,8 +34,6 @@ async def main() -> None:
             "run_started_at": datetime.now(timezone.utc).isoformat(),
         }
     )
-    if os.getenv("HF_TOKEN") and os.getenv("HF_DATASET_REPO"):
-        push_to_hf(PARQUET_FILE)
 
 
 if __name__ == "__main__":
