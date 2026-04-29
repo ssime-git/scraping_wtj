@@ -51,6 +51,14 @@ async def _write_debug_artifacts(page: Page, logger: logging.Logger) -> None:
         logger.warning("Failed to write WTTJ debug artifacts: %s", exc)
 
 
+async def _wait_for_matches_ready(page: Page) -> None:
+    await page.get_by_text("Vos préférences", exact=True).first.wait_for(state="visible", timeout=120_000)
+    await page.get_by_role("button", name="Modifier les préférences").first.wait_for(
+        state="visible",
+        timeout=120_000,
+    )
+
+
 async def login_to_matches(
     context: BrowserContext,
     login_url: str,
@@ -84,11 +92,11 @@ async def login_to_matches(
                     raise
                 logger.info("Matches navigation was interrupted by an in-flight redirect; waiting for final URL")
         await page.wait_for_url(matches_pattern, timeout=120_000)
-        await page.locator('input[name="futureRole"]').first.wait_for(state="visible", timeout=120_000)
+        await _dismiss_cookie_overlay(page)
+        await _wait_for_matches_ready(page)
     except (PlaywrightTimeoutError, PlaywrightError) as exc:
         await _write_debug_artifacts(page, logger)
         await page.close()
         raise RuntimeError(f"Login did not reach jobs-matches: {matches_url}") from exc
-    await _dismiss_cookie_overlay(page)
     logger.info("Authenticated on jobs-matches")
     return page
