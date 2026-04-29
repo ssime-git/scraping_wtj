@@ -20,6 +20,11 @@ async def _dismiss_cookie_overlay(page: Page) -> None:
         if await button.count():
             await button.click(timeout=5_000)
             break
+    for label in ("OK pour moi", "Non merci", "Je choisis"):
+        button = page.get_by_role("button", name=label).first
+        if await button.count():
+            await button.click(timeout=5_000)
+            return
 
 
 async def _write_debug_artifacts(page: Page, logger: logging.Logger) -> None:
@@ -53,10 +58,7 @@ async def _write_debug_artifacts(page: Page, logger: logging.Logger) -> None:
 
 async def _wait_for_matches_ready(page: Page) -> None:
     await page.get_by_text("Vos préférences", exact=True).first.wait_for(state="visible", timeout=120_000)
-    await page.get_by_role("button", name="Modifier les préférences").first.wait_for(
-        state="visible",
-        timeout=120_000,
-    )
+    await page.get_by_text("Enregistrer", exact=True).first.wait_for(state="visible", timeout=120_000)
 
 
 async def login_to_matches(

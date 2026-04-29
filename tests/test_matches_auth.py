@@ -9,6 +9,14 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from wttj_scraper.matches_auth import login_to_matches
 
 
+def _button_with_count(count: int) -> AsyncMock:
+    button = AsyncMock()
+    button.first.count = AsyncMock(return_value=count)
+    button.first.click = AsyncMock()
+    button.first.wait_for = AsyncMock()
+    return button
+
+
 @pytest.mark.asyncio
 async def test_login_to_matches_fills_credentials_and_waits_for_matches_url():
     page = AsyncMock()
@@ -35,14 +43,15 @@ async def test_login_to_matches_fills_credentials_and_waits_for_matches_url():
     cookie_main.first.click = AsyncMock()
     preferences_heading = AsyncMock()
     preferences_heading.first.wait_for = AsyncMock()
-    preferences_button = AsyncMock()
-    preferences_button.first.wait_for = AsyncMock()
+    save_text = AsyncMock()
+    save_text.first.wait_for = AsyncMock()
     cookie_dismiss_after = AsyncMock()
     cookie_dismiss_after.first.count = AsyncMock(return_value=1)
     cookie_dismiss_after.first.click = AsyncMock()
-    page.get_by_role = MagicMock(return_value=login_button)
-    page.get_by_text = MagicMock(return_value=preferences_heading)
-    page.get_by_role = MagicMock(side_effect=[login_button, preferences_button])
+    page.get_by_text = MagicMock(side_effect=[preferences_heading, save_text])
+    page.get_by_role = MagicMock(
+        side_effect=lambda _role, name, exact=False: login_button if name == "Se connecter" else _button_with_count(0)
+    )
     page.locator = MagicMock(
         side_effect=[
             cookie_dismiss,
@@ -78,7 +87,7 @@ async def test_login_to_matches_fills_credentials_and_waits_for_matches_url():
     password_locator.first.fill.assert_awaited_once_with("secret")
     login_button.first.click.assert_awaited_once()
     preferences_heading.first.wait_for.assert_awaited_once_with(state="visible", timeout=120_000)
-    preferences_button.first.wait_for.assert_awaited_once_with(state="visible", timeout=120_000)
+    save_text.first.wait_for.assert_awaited_once_with(state="visible", timeout=120_000)
     cookie_dismiss.first.click.assert_awaited_once_with(timeout=5_000)
     cookie_dismiss_after.first.click.assert_awaited_once_with(timeout=5_000)
 
@@ -106,6 +115,8 @@ async def test_login_to_matches_raises_when_redirect_never_happens():
     cookie_main.first.count = AsyncMock(return_value=0)
     preferences_heading = AsyncMock()
     preferences_heading.first.wait_for = AsyncMock(side_effect=PlaywrightTimeoutError("no matches page"))
+    save_text = AsyncMock()
+    save_text.first.wait_for = AsyncMock()
     debug_screenshot = AsyncMock()
     debug_content = AsyncMock(return_value="<html></html>")
     body_locator = AsyncMock()
@@ -113,11 +124,13 @@ async def test_login_to_matches_raises_when_redirect_never_happens():
     page.screenshot = debug_screenshot
     page.content = debug_content
     page.title = AsyncMock(return_value="title")
-    page.get_by_text = MagicMock(return_value=preferences_heading)
+    page.get_by_text = MagicMock(side_effect=[preferences_heading, save_text])
     page.locator = MagicMock(
         side_effect=[cookie_dismiss, cookie_accept, cookie_main, email_locator, password_locator, body_locator]
     )
-    page.get_by_role = MagicMock(side_effect=[login_button, AsyncMock()])
+    page.get_by_role = MagicMock(
+        side_effect=lambda _role, name, exact=False: login_button if name == "Se connecter" else _button_with_count(0)
+    )
     context = AsyncMock()
     context.new_page = AsyncMock(return_value=page)
 
@@ -156,12 +169,14 @@ async def test_login_to_matches_tolerates_aborted_navigation_when_redirect_conti
     cookie_main.first.count = AsyncMock(return_value=0)
     preferences_heading = AsyncMock()
     preferences_heading.first.wait_for = AsyncMock()
-    preferences_button = AsyncMock()
-    preferences_button.first.wait_for = AsyncMock()
+    save_text = AsyncMock()
+    save_text.first.wait_for = AsyncMock()
     cookie_dismiss_after = AsyncMock()
     cookie_dismiss_after.first.count = AsyncMock(return_value=0)
-    page.get_by_text = MagicMock(return_value=preferences_heading)
-    page.get_by_role = MagicMock(side_effect=[login_button, preferences_button])
+    page.get_by_text = MagicMock(side_effect=[preferences_heading, save_text])
+    page.get_by_role = MagicMock(
+        side_effect=lambda _role, name, exact=False: login_button if name == "Se connecter" else _button_with_count(0)
+    )
     page.locator = MagicMock(
         side_effect=[
             cookie_dismiss,
