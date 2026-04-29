@@ -15,9 +15,13 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_DATASET_REPO: ${{ secrets.HF_DATASET_REPO }}
+          WTTJ_EMAIL: ${{ secrets.WTTJ_EMAIL }}
+          WTTJ_PASSWORD: ${{ secrets.WTTJ_PASSWORD }}
         run: |
           test -n "$HF_TOKEN" || (echo "::error::Missing GitHub secret HF_TOKEN" && exit 1)
           test -n "$HF_DATASET_REPO" || (echo "::error::Missing GitHub secret HF_DATASET_REPO" && exit 1)
+          test -n "$WTTJ_EMAIL" || (echo "::error::Missing GitHub secret WTTJ_EMAIL" && exit 1)
+          test -n "$WTTJ_PASSWORD" || (echo "::error::Missing GitHub secret WTTJ_PASSWORD" && exit 1)
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -37,7 +41,7 @@ jobs:
 
           from huggingface_hub import hf_hub_download
 
-          for filename in ("jobs.parquet", "seen_urls.txt"):
+          for filename in ("jobs.parquet",):
               try:
                   path = hf_hub_download(
                       repo_id=os.environ["HF_DATASET_REPO"],
@@ -61,5 +65,8 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_DATASET_REPO: ${{ secrets.HF_DATASET_REPO }}
+          WTTJ_EMAIL: ${{ secrets.WTTJ_EMAIL }}
+          WTTJ_PASSWORD: ${{ secrets.WTTJ_PASSWORD }}
+          WTTJ_MATCHES_CONFIG: config/wttj_matches.yaml
           DATA_DIR: data
-        run: uv run python scripts/scrape_to_csv.py
+        run: uv run python scripts/scrape_matches_to_parquet.py

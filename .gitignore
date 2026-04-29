@@ -2,5 +2,6 @@
 __pycache__/
 *.pyc
 .codex
+.worktrees/
 data/*.csv
 data/seen_urls.txt

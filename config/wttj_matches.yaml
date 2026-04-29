@@ -1,0 +1,50 @@
+auth:
+  login_url: "https://www.welcometothejungle.com/fr/authenticate/signin?redirect=%2Ffr%2Fjobs"
+  matches_url: "https://www.welcometothejungle.com/fr/jobs-matches"
+  email_env: "WTTJ_EMAIL"
+  password_env: "WTTJ_PASSWORD"
+
+global_filters:
+  location: ["France"]
+  experience:
+    - "Intermédiaire (3-5 ans)"
+    - "Junior (1-3 ans)"
+    - "Débutant/Diplômé (0-1 an)"
+  remote:
+    - "Télétravail fréquent"
+    - "Télétravail occasionnel"
+    - "Pas de télétravail"
+    - "Télétravail total"
+  contract:
+    - "CDI"
+    - "CDD / Temporaire"
+    - "Stage"
+  salary: ["≥ 10K €par an"]
+
+families:
+  data_engineer:
+    roles: ["Data Engineer", "Analytics Engineer", "Ingénieur Data"]
+  data_scientist:
+    roles: ["Data Scientist", "Applied Scientist", "Scientist"]
+  data_analyst:
+    roles: ["Data Analyst", "Business Analyst", "Product Analyst", "BI Analyst"]
+  ml_engineer:
+    roles: ["ML Engineer", "Machine Learning Engineer", "AI Engineer"]
+  mlops:
+    roles: ["MLOps", "ML Platform", "Machine Learning Platform", "MLOps Engineer"]
+  cyber:
+    roles: ["Cybersecurity", "Security Engineer", "Sécurité", "Cloud Security", "AppSec"]
+
+limits:
+  max_jobs_per_family: 25
+  max_pages_per_role: 10
+
+timing:
+  action_delay_seconds: [1.0, 2.0]
+  family_delay_seconds: [4.0, 7.0]
+  detail_delay_seconds: [1.5, 3.0]
+
+output:
+  save_json: true
+  save_parquet: true
+  include_listing_snapshot: true

@@ -162,6 +162,7 @@ def test_parse_summary_metadata_supports_observed_contracts_and_cities():
     assert parse_summary_metadata("Alternance Levallois-Perret Télétravail fréquent")["city"] == "Levallois-Perret"
     assert parse_summary_metadata("Alternance Fontenay-sous-Bois Télétravail fréquent")["city"] == "Fontenay-sous-Bois"
     assert parse_summary_metadata("Alternance Puteaux Télétravail fréquent")["city"] == "Puteaux"
+    assert parse_summary_metadata("CDI Grenoble Télétravail occasionnel")["city"] == "Grenoble"
 
 
 def test_parse_summary_metadata_filters_skill_noise():

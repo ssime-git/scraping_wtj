@@ -37,3 +37,12 @@ def test_main_uses_defaults(capsys):
 
     captured = capsys.readouterr()
     assert json.loads(captured.out)["count"] == 1
+
+
+def test_main_supports_config_driven_authenticated_mode(capsys):
+    with patch("wttj_cli.main.scrape_authenticated_matches", AsyncMock(return_value=_MOCK_RESULT)):
+        from wttj_cli.main import main
+        main(["--config", "config/wttj_matches.yaml"])
+
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["count"] == 1
