@@ -62,3 +62,27 @@ def test_should_run_now_true_when_due_and_unlocked() -> None:
     decision = should_run_now(datetime(2026, 4, 29, 4, 30), state, config, lock_held=False)
     assert decision.run is True
     assert decision.reason == "due"
+
+
+from wttj_scraper.local_scheduler import mark_run_finished, mark_run_started
+
+
+def test_mark_run_started_sets_started_fields() -> None:
+    state = SchedulerState(date="2026-04-29", target_time="04:00", last_status="scheduled")
+    updated = mark_run_started(state, "2026-04-29T04:01:00")
+    assert updated.last_status == "running"
+    assert updated.last_started_at == "2026-04-29T04:01:00"
+
+
+def test_mark_run_finished_success_sets_success_fields() -> None:
+    state = SchedulerState(date="2026-04-29", target_time="04:00", last_status="running")
+    updated = mark_run_finished(state, "2026-04-29T04:10:00", success=True)
+    assert updated.last_status == "success"
+    assert updated.last_succeeded_at == "2026-04-29T04:10:00"
+
+
+def test_mark_run_finished_failure_sets_failure_fields() -> None:
+    state = SchedulerState(date="2026-04-29", target_time="04:00", last_status="running")
+    updated = mark_run_finished(state, "2026-04-29T04:10:00", success=False)
+    assert updated.last_status == "failed"
+    assert updated.last_failed_at == "2026-04-29T04:10:00"
