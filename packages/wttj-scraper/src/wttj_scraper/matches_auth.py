@@ -61,6 +61,7 @@ async def login_to_matches(
 ) -> Page:
     page = await context.new_page()
     await page.goto(login_url, wait_until="domcontentloaded", timeout=120_000)
+    await _dismiss_cookie_overlay(page)
     email_locator = page.locator('input[type="email"], input[name="email"]')
     password_locator = page.locator('input[type="password"], input[name="password"]')
     login_button = page.get_by_role("button", name="Se connecter")
