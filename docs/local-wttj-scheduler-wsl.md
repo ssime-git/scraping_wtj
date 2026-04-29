@@ -3,8 +3,8 @@
 The live WTTJ scrape no longer runs inside GitHub Actions.
 
 Production execution path:
-- `systemd --user` timer wakes the local scheduler
-- local scheduler may start the local scrape service
+- `systemd --user` timer wakes the local scheduler every 30 min
+- local scheduler decides whether today's scrape is due
 - local scrape service runs the WTTJ scrape and HF upload
 
 GitHub Actions responsibility:
@@ -14,18 +14,26 @@ GitHub Actions responsibility:
 
 ## Install
 
+Symlinks keep unit files in sync with the repo — after a `git pull` that modifies them, only `daemon-reload` is needed.
+
 ```bash
-mkdir -p ~/.config ~/.local/state/wttj-scrape ~/.config/systemd/user
-cp deploy/systemd/wttj-scrape.service ~/.config/systemd/user/
-cp deploy/systemd/wttj-scheduler.service ~/.config/systemd/user/
-cp deploy/systemd/wttj-scheduler.timer ~/.config/systemd/user/
+mkdir -p ~/.config/systemd/user ~/.local/state/wttj-scrape
+ln -sf "$(pwd)/deploy/systemd/wttj-scrape.service" ~/.config/systemd/user/
+ln -sf "$(pwd)/deploy/systemd/wttj-scheduler.service" ~/.config/systemd/user/
+ln -sf "$(pwd)/deploy/systemd/wttj-scheduler.timer" ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now wttj-scheduler.timer
 ```
 
+After any `git pull` that touches `deploy/systemd/`:
+
+```bash
+systemctl --user daemon-reload
+```
+
 ## Environment
 
-Create `~/.config/wttj-scrape.env` with:
+Create `~/.config/wttj-scrape.env`:
 
 ```bash
 WTTJ_EMAIL=...
@@ -49,8 +57,8 @@ systemctl --user status wttj-scheduler.timer
 # Trigger a scrape immediately (bypasses scheduler logic)
 systemctl --user start wttj-scrape.service
 
-# View scrape logs
-journalctl --user -u wttj-scrape.service -n 200 --no-pager
+# Follow scrape logs live
+journalctl --user -u wttj-scrape.service -f
 
 # View scheduler decision logs
 journalctl --user -u wttj-scheduler.service -n 50 --no-pager
