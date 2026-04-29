@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from wttj_scraper.local_scheduler import SchedulerConfig, load_state, should_run_now, store_state
+from wttj_scraper.local_scheduler import SchedulerConfig, is_lock_held, load_state, should_run_now, store_state
 
 STATE_PATH = Path(os.getenv("WTTJ_STATE_PATH", Path.home() / ".local/state/wttj-scrape/state.json"))
 LOCK_PATH = Path(os.getenv("WTTJ_LOCK_PATH", Path.home() / ".local/state/wttj-scrape/run.lock"))
@@ -19,7 +19,7 @@ def main() -> int:
         seed=os.getenv("WTTJ_SCHEDULER_SEED", "wttj-local"),
     )
     state = load_state(STATE_PATH)
-    decision = should_run_now(datetime.now(), state, config, lock_held=LOCK_PATH.exists())
+    decision = should_run_now(datetime.now(), state, config, lock_held=is_lock_held(LOCK_PATH))
     store_state(STATE_PATH, decision.state)
     print(f"decision={decision.reason} run={decision.run}")
     if not decision.run:

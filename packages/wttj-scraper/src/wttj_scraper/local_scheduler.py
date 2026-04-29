@@ -2,10 +2,23 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, time
+import fcntl
 import hashlib
 import json
 import random
 from pathlib import Path
+
+
+def is_lock_held(path: Path) -> bool:
+    """Return True only if the lock file is actively held by another process."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fh, fcntl.LOCK_UN)
+        return False
+    except OSError:
+        return True
 
 
 @dataclass(slots=True)
