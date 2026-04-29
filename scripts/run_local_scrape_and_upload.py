@@ -10,6 +10,7 @@ from wttj_scraper.local_scheduler import load_state, mark_run_finished, mark_run
 
 STATE_PATH = Path(os.getenv("WTTJ_STATE_PATH", Path.home() / ".local/state/wttj-scrape/state.json"))
 LOCK_PATH = Path(os.getenv("WTTJ_LOCK_PATH", Path.home() / ".local/state/wttj-scrape/run.lock"))
+UV = os.getenv("UV_BIN", "/home/seb/.local/bin/uv")
 
 
 def _run(command: list[str]) -> None:
@@ -21,8 +22,8 @@ def main() -> int:
     started_at = datetime.now().isoformat(timespec="seconds")
     store_state(STATE_PATH, mark_run_started(state, started_at))
     try:
-        _run(["uv", "run", "python", "scripts/scrape_matches_to_parquet.py"])
-        _run(["uv", "run", "--package", "wttj-scraper", "--extra", "hf", "python", "scripts/upload_parquet_to_hf.py"])
+        _run([UV, "run", "python", "scripts/scrape_matches_to_parquet.py"])
+        _run([UV, "run", "--package", "wttj-scraper", "--extra", "hf", "python", "scripts/upload_parquet_to_hf.py"])
     except subprocess.CalledProcessError:
         finished = datetime.now().isoformat(timespec="seconds")
         store_state(STATE_PATH, mark_run_finished(load_state(STATE_PATH), finished, success=False))
