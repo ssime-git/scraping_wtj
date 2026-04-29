@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - wttj-auth-hf-pipeline
   pull_request:
 
 jobs:
