@@ -117,13 +117,21 @@ EOF
 
 ### 3. Install systemd units
 
+Symlinks keep the unit files in sync with the repo — after a `git pull` that modifies them, a `daemon-reload` is all that's needed.
+
 ```bash
 mkdir -p ~/.config/systemd/user ~/.local/state/wttj-scrape
-cp deploy/systemd/wttj-scrape.service ~/.config/systemd/user/
-cp deploy/systemd/wttj-scheduler.service ~/.config/systemd/user/
-cp deploy/systemd/wttj-scheduler.timer ~/.config/systemd/user/
+ln -sf "$(pwd)/deploy/systemd/wttj-scrape.service" ~/.config/systemd/user/
+ln -sf "$(pwd)/deploy/systemd/wttj-scheduler.service" ~/.config/systemd/user/
+ln -sf "$(pwd)/deploy/systemd/wttj-scheduler.timer" ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now wttj-scheduler.timer
+```
+
+After any `git pull` that touches `deploy/systemd/`:
+
+```bash
+systemctl --user daemon-reload
 ```
 
 ## Operations
