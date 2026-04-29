@@ -4,4 +4,8 @@ __pycache__/
 .codex
 .worktrees/
 data/*.csv
+data/*.parquet
 data/seen_urls.txt
+.env
+.superpowers/
+docs/superpowers/
