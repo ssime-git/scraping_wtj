@@ -1,0 +1,11 @@
+[Unit]
+Description=WTTJ local scheduler decision
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/wttj-scrape.env
+WorkingDirectory=/home/seb/project/scraping_wtj
+ExecStart=/home/seb/.local/bin/uv run python scripts/run_scheduler_check.py
+TimeoutStartSec=5min

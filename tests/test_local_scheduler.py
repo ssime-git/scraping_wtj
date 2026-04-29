@@ -86,3 +86,16 @@ def test_mark_run_finished_failure_sets_failure_fields() -> None:
     updated = mark_run_finished(state, "2026-04-29T04:10:00", success=False)
     assert updated.last_status == "failed"
     assert updated.last_failed_at == "2026-04-29T04:10:00"
+
+
+def test_should_run_now_false_when_failed_today() -> None:
+    config = SchedulerConfig(window_start="03:30", window_end="05:30", seed="wttj-prod")
+    state = SchedulerState(
+        date="2026-04-29",
+        target_time="04:00",
+        last_status="failed",
+        last_failed_at="2026-04-29T04:08:00",
+    )
+    decision = should_run_now(datetime(2026, 4, 29, 4, 30), state, config, lock_held=False)
+    assert decision.run is False
+    assert decision.reason == "already_failed_today"

@@ -1,0 +1,11 @@
+[Unit]
+Description=WTTJ scrape and Hugging Face upload
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/wttj-scrape.env
+WorkingDirectory=/home/seb/project/scraping_wtj
+ExecStart=/usr/bin/flock -n %h/.local/state/wttj-scrape/run.lock /home/seb/.local/bin/uv run python scripts/run_local_scrape_and_upload.py
+TimeoutStartSec=3h
