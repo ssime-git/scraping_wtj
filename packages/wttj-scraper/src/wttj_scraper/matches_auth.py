@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from playwright.async_api import BrowserContext, Page, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import BrowserContext, Error as PlaywrightError, Page, TimeoutError as PlaywrightTimeoutError
 
 
 def _wait_pattern_from_url(url: str) -> str:
@@ -70,14 +70,22 @@ async def login_to_matches(
     await email_locator.first.fill(email)
     await password_locator.first.fill(password)
     await login_button.first.click()
+    matches_pattern = _wait_pattern_from_url(matches_url)
     try:
-        await page.wait_for_load_state("domcontentloaded", timeout=120_000)
+        await page.wait_for_url(matches_pattern, timeout=30_000)
     except PlaywrightTimeoutError:
-        logger.warning("Login submit did not reach domcontentloaded before continuing to matches page")
+        logger.info("Login did not auto-redirect to jobs-matches; opening matches page explicitly")
     try:
-        await page.goto(matches_url, wait_until="domcontentloaded", timeout=120_000)
+        if not page.url.startswith(matches_url):
+            try:
+                await page.goto(matches_url, wait_until="domcontentloaded", timeout=120_000)
+            except PlaywrightError as exc:
+                if "ERR_ABORTED" not in str(exc):
+                    raise
+                logger.info("Matches navigation was interrupted by an in-flight redirect; waiting for final URL")
+        await page.wait_for_url(matches_pattern, timeout=120_000)
         await page.locator('input[name="futureRole"]').first.wait_for(state="visible", timeout=120_000)
-    except PlaywrightTimeoutError as exc:
+    except (PlaywrightTimeoutError, PlaywrightError) as exc:
         await _write_debug_artifacts(page, logger)
         await page.close()
         raise RuntimeError(f"Login did not reach jobs-matches: {matches_url}") from exc
