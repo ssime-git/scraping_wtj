@@ -29,10 +29,12 @@ async def login_to_matches(
     logger: logging.Logger,
 ) -> Page:
     page = await context.new_page()
-    await page.goto(login_url, wait_until="networkidle", timeout=120_000)
+    await page.goto(login_url, wait_until="domcontentloaded", timeout=120_000)
     email_locator = page.locator('input[type="email"], input[name="email"]')
     password_locator = page.locator('input[type="password"], input[name="password"]')
     login_button = page.get_by_role("button", name="Se connecter")
+    await email_locator.first.wait_for(state="visible", timeout=120_000)
+    await password_locator.first.wait_for(state="visible", timeout=120_000)
     await email_locator.first.fill(email)
     await password_locator.first.fill(password)
     await login_button.first.click()
@@ -41,7 +43,7 @@ async def login_to_matches(
     except PlaywrightTimeoutError as exc:
         await page.close()
         raise RuntimeError(f"Login did not reach jobs-matches: {matches_url}") from exc
-    await page.wait_for_load_state("networkidle", timeout=120_000)
+    await page.wait_for_load_state("domcontentloaded", timeout=120_000)
     await _dismiss_cookie_overlay(page)
     logger.info("Authenticated on jobs-matches")
     return page
