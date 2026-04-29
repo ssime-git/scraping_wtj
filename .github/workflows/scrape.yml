@@ -5,11 +5,22 @@ on:
     - cron: "0 7 * * *"  # daily at 7am UTC
   workflow_dispatch:
 
+concurrency:
+  group: scrape-wttj
+  cancel-in-progress: false
+
 jobs:
   scrape:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, wttj]
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+
+      - name: Show runner context
+        run: |
+          echo "Runner: $RUNNER_NAME"
+          echo "OS: $RUNNER_OS"
+          echo "Arch: $RUNNER_ARCH"
 
       - name: Validate HF secrets
         env:
@@ -59,7 +70,7 @@ jobs:
           PY
 
       - name: Install Playwright
-        run: uv run playwright install chromium --with-deps
+        run: uv run playwright install chromium
 
       - name: Run scraper
         id: scrape
