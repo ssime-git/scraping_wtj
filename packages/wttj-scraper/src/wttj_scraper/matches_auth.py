@@ -39,11 +39,15 @@ async def login_to_matches(
     await password_locator.first.fill(password)
     await login_button.first.click()
     try:
-        await page.wait_for_url(_wait_pattern_from_url(matches_url), timeout=120_000)
+        await page.wait_for_load_state("domcontentloaded", timeout=120_000)
+    except PlaywrightTimeoutError:
+        logger.warning("Login submit did not reach domcontentloaded before continuing to matches page")
+    try:
+        await page.goto(matches_url, wait_until="domcontentloaded", timeout=120_000)
+        await page.locator('input[name="futureRole"]').first.wait_for(state="visible", timeout=120_000)
     except PlaywrightTimeoutError as exc:
         await page.close()
         raise RuntimeError(f"Login did not reach jobs-matches: {matches_url}") from exc
-    await page.wait_for_load_state("domcontentloaded", timeout=120_000)
     await _dismiss_cookie_overlay(page)
     logger.info("Authenticated on jobs-matches")
     return page
