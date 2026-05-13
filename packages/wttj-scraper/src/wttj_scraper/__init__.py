@@ -1,5 +1,7 @@
+import os
 import asyncio
 from datetime import datetime, timezone
+from pathlib import Path
 
 from wttj_models.job import ScrapeResult
 from wttj_scraper.browser import browser_context
@@ -10,6 +12,9 @@ from wttj_scraper.listing import scrape_listing
 from wttj_scraper.orchestrator import run_authenticated_matches
 
 _DELAY_BETWEEN_DETAILS = 1.2
+_AUTH_STATE_PATH = Path(
+    os.getenv("WTTJ_AUTH_STATE_PATH", str(Path.home() / ".local/state/wttj-scrape/auth-state.json")),
+)
 
 
 async def scrape(
@@ -37,5 +42,5 @@ async def scrape(
 async def scrape_authenticated_matches(config_path: str) -> ScrapeResult:
     config = load_matches_config(config_path)
     logger = configure_logger()
-    async with browser_context() as context:
+    async with browser_context(storage_state_path=_AUTH_STATE_PATH) as context:
         return await run_authenticated_matches(context, config, logger)

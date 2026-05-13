@@ -23,6 +23,22 @@ Core scraping library for Welcome to the Jungle. Handles browser automation, aut
 | `local_scheduler.py` | Deterministic daily scheduling: state, decision logic, run tracking |
 | `logging_utils.py` | Logging configuration |
 
+## Auth state
+
+Authenticated scraping now reuses a Playwright storage state file instead of logging in from scratch on every run. The default path is:
+
+```bash
+~/.local/state/wttj-scrape/auth-state.json
+```
+
+Refresh it with:
+
+```bash
+make wttj-refresh-auth
+```
+
+That command runs headless, retries on transient failures, and writes the storage state back to disk when login succeeds.
+
 ## Authenticated scrape flow
 
 ```

@@ -12,6 +12,7 @@ flowchart TD
         SCRAPE["run_local_scrape_and_upload.py\nscrape + upload"]
         LOCK["run.lock\nflock"]
         STATE["state.json\nlast run status"]
+        AUTH["auth-state.json\nPlaywright storage state"]
         BROWSER["Playwright / Chromium\nauthenticated scrape"]
         PARQUET["data/jobs.parquet"]
     end
@@ -30,6 +31,7 @@ flowchart TD
     SCHED -->|"due + unlocked"| SCRAPE
     SCRAPE --> LOCK
     SCRAPE --> STATE
+    SCRAPE --> AUTH
     SCRAPE --> BROWSER
     BROWSER --> PARQUET
     PARQUET -->|"hf_hub upload"| DATASET
@@ -47,6 +49,7 @@ flowchart TD
 | `wttj-scheduler.timer` | Local WSL2 | Wakes the scheduler every 30 min |
 | `run_scheduler_check.py` | Local WSL2 | Decides whether today's scrape is due |
 | `run_local_scrape_and_upload.py` | Local WSL2 | Runs scrape → parquet → HF upload |
+| `auth-state.json` | Local WSL2 | Cached Playwright storage state used for headless reauth |
 | HF Dataset `huggingsime/wttj-jobs` | Hugging Face | Stores `jobs.parquet` (private) |
 | HF Space (Streamlit) | Hugging Face | Browsing UI with auth, filters, CSV export |
 | `Validate WTTJ Pipeline` | GitHub Actions | Runs test suite on every push/PR |
@@ -109,6 +112,7 @@ HF_DATASET_REPO=<hf-username/dataset-name>
 WTTJ_MATCHES_CONFIG=/path/to/scraping_wtj/config/wttj_matches.yaml
 DATA_DIR=/path/to/scraping_wtj/data
 WTTJ_DEBUG_DIR=/path/to/scraping_wtj/artifacts/wttj-debug
+WTTJ_AUTH_STATE_PATH=/path/to/.local/state/wttj-scrape/auth-state.json
 WTTJ_WINDOW_START=03:30
 WTTJ_WINDOW_END=05:30
 WTTJ_SCHEDULER_SEED=wttj-prod
@@ -136,25 +140,25 @@ systemctl --user daemon-reload
 
 ## Operations
 
+Prefer the `make` targets below. They wrap the `systemctl` and `journalctl` commands used by the service:
+
 ```bash
-# Check timer status and next scheduled wake-up
-systemctl --user status wttj-scheduler.timer
-
-# Trigger a scrape immediately (bypasses scheduling logic)
-systemctl --user start wttj-scrape.service
-
-# Follow scrape logs live
-journalctl --user -u wttj-scrape.service -f
-
-# View scheduler decision logs
-journalctl --user -u wttj-scheduler.service -n 50 --no-pager
-
-# Inspect current scheduler state
-cat ~/.local/state/wttj-scrape/state.json
-
-# Run tests
-uv run pytest
+make wttj-scheduler-status
+make wttj-status
+make wttj-start
+make wttj-restart
+make wttj-logs
+make wttj-scheduler-start
+make wttj-scheduler-restart
+make wttj-scheduler-logs
+make wttj-refresh-auth
+make wttj-state
+make wttj-auth-state
+make
+UV_CACHE_DIR=/tmp/uv-cache uv run pytest
 ```
+
+`make wttj-refresh-auth` runs the headless reauth bootstrap and writes the storage state to `~/.local/state/wttj-scrape/auth-state.json`. The scrape service reuses that file on subsequent runs.
 
 ## GitHub Actions
 

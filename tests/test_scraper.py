@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch
+from pathlib import Path
 from wttj_models.job import JobDetail, JobListing, ScrapeResult
 from wttj_scraper import scrape
 
@@ -103,7 +104,8 @@ async def test_scrape_authenticated_matches_uses_browser_context_and_orchestrato
         result = await scrape_authenticated_matches("config/wttj_matches.yaml")
 
     mock_load.assert_called_once_with("config/wttj_matches.yaml")
-    mock_bctx.assert_called_once_with()
+    mock_bctx.assert_called_once()
+    assert mock_bctx.call_args.kwargs["storage_state_path"] == Path.home() / ".local/state/wttj-scrape/auth-state.json"
     mock_bctx.return_value.__aenter__.assert_awaited_once()
     mock_run_authenticated_matches.assert_awaited_once_with(entered_context, loaded_config, logger)
     assert result == expected_result

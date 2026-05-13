@@ -43,6 +43,7 @@ HF_DATASET_REPO=...
 WTTJ_MATCHES_CONFIG=/home/seb/project/scraping_wtj/config/wttj_matches.yaml
 DATA_DIR=/home/seb/project/scraping_wtj/data
 WTTJ_DEBUG_DIR=/home/seb/project/scraping_wtj/artifacts/wttj-debug
+WTTJ_AUTH_STATE_PATH=/home/seb/.local/state/wttj-scrape/auth-state.json
 WTTJ_WINDOW_START=03:30
 WTTJ_WINDOW_END=05:30
 WTTJ_SCHEDULER_SEED=wttj-prod
@@ -50,19 +51,20 @@ WTTJ_SCHEDULER_SEED=wttj-prod
 
 ## Operations
 
+Use `make` first. The targets mirror the live systemd operations:
+
 ```bash
-# Check timer status and next wake-up
-systemctl --user status wttj-scheduler.timer
-
-# Trigger a scrape immediately (bypasses scheduler logic)
-systemctl --user start wttj-scrape.service
-
-# Follow scrape logs live
-journalctl --user -u wttj-scrape.service -f
-
-# View scheduler decision logs
-journalctl --user -u wttj-scheduler.service -n 50 --no-pager
-
-# Check persisted state
-cat ~/.local/state/wttj-scrape/state.json
+make wttj-scheduler-status
+make wttj-status
+make wttj-start
+make wttj-restart
+make wttj-logs
+make wttj-scheduler-start
+make wttj-scheduler-restart
+make wttj-scheduler-logs
+make wttj-refresh-auth
+make wttj-state
+make wttj-auth-state
 ```
+
+`make wttj-refresh-auth` performs the headless login bootstrap and writes `~/.local/state/wttj-scrape/auth-state.json`. The scrape service consumes that file automatically.
