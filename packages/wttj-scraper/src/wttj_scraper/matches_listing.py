@@ -6,7 +6,9 @@ from playwright.async_api import Page
 
 
 async def extract_listing_cards(page: Page) -> list[dict[str, str | None]]:
-    return await page.locator('a[href*="/jobs/"]').evaluate_all(
+    # Cards are now div[data-testid^="job-card-"]; the <a href*="/jobs/"> is the
+    # title element itself (text content), not a wrapper with <p> children.
+    return await page.locator('[data-testid^="job-card-"]').evaluate_all(
         """
         els => {
             const normalize = (value) => (value || '').replace(/\\s+/g, ' ').trim();
@@ -19,10 +21,10 @@ async def extract_listing_cards(page: Page) -> list[dict[str, str | None]]:
                 return out;
             };
             return els.map(el => {
-                const url = el.href;
-                const title =
-                    uniqueTexts(el.querySelectorAll("p[class*='heading-md'], p[class*='heading-sm'], h1, h2, h3, h4"))[0] ||
-                    null;
+                const anchor = el.querySelector('a[href*="/jobs/"]');
+                if (!anchor) return null;
+                const url = anchor.href;
+                const title = normalize(anchor.textContent) || null;
                 const company =
                     uniqueTexts(el.querySelectorAll("p[class*='body-lg-strong'], p[class*='body-md-strong']"))[0] ||
                     null;
@@ -37,7 +39,7 @@ async def extract_listing_cards(page: Page) -> list[dict[str, str | None]]:
                     title,
                     snippet: snippetParts.join(' ') || null,
                 };
-            }).filter(row => row.url && row.title);
+            }).filter(row => row && row.url && row.title);
         }
         """
     )

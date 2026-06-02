@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
 import re
 
@@ -37,6 +38,11 @@ async def _open_section(page: Page, title: str) -> None:
     expanded = await section_button.get_attribute("aria-expanded")
     if expanded != "true":
         await section_button.click()
+        for _ in range(25):
+            await asyncio.sleep(0.2)
+            if await section_button.get_attribute("aria-expanded") == "true":
+                return
+        raise RuntimeError(f"Section '{title}' did not expand after click")
 
 
 async def _click_label(page: Page, label: str) -> None:

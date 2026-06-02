@@ -23,5 +23,23 @@ services:
     environment:
       DATA_PATH: /data/jobs.csv
 
+  healthchecks:
+    image: healthchecks/healthchecks:latest
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - healthchecks-data:/data
+    environment:
+      SECRET_KEY: a6b45bcb9788fa4f091b75828669a45a1ef27101a8e1cb600a71061f18c35e79
+      ALLOWED_HOSTS: localhost
+      SITE_ROOT: http://localhost:8000
+      DB: sqlite3
+      DB_NAME: /data/hc.sqlite
+      REGISTRATION_OPEN: "True"
+      DEBUG: "False"
+      PING_ENDPOINT: http://localhost:8000/ping/
+
 volumes:
   data:
+  healthchecks-data:
