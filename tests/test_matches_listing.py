@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from wttj_scraper.matches_listing import (
@@ -8,7 +10,7 @@ from wttj_scraper.matches_listing import (
 
 
 def test_dedupe_listing_urls_keeps_first_seen_order():
-    rows = [
+    rows: list[dict[str, str | None]] = [
         {"url": "https://example.com/1", "title": "A"},
         {"url": "https://example.com/2", "title": "B"},
         {"url": "https://example.com/1", "title": "A again"},
@@ -24,9 +26,9 @@ def test_dedupe_listing_urls_keeps_first_seen_order():
 
 @pytest.mark.asyncio
 async def test_extract_listing_cards_reads_link_text_and_href():
-    page = type("Page", (), {})()
-    locator_calls = []
-    evaluate_all_scripts = []
+    page: Any = type("Page", (), {})()
+    locator_calls: list[str] = []
+    evaluate_all_scripts: list[str] = []
 
     class Locator:
         async def evaluate_all(self, _script: str):
@@ -54,15 +56,15 @@ async def test_extract_listing_cards_reads_link_text_and_href():
 
     assert cards[0]["title"] == "Data Engineer"
     assert cards[1]["url"] == "https://example.com/2"
-    assert locator_calls == ['a[href*="/jobs/"]']
-    assert "heading-md" in evaluate_all_scripts[0]
+    assert locator_calls == ['[data-testid^="job-card-"]']
+    assert 'a[href*="/jobs/"]' in evaluate_all_scripts[0]
     assert "body-lg-strong" in evaluate_all_scripts[0]
     assert "replace(/\\s+/g, ' ')" in evaluate_all_scripts[0]
 
 
 def test_accumulate_family_candidates_accumulates_until_cap():
-    existing = [{"url": "https://example.com/1", "title": "A", "snippet": "a"}]
-    fresh = [
+    existing: list[dict[str, str | None]] = [{"url": "https://example.com/1", "title": "A", "snippet": "a"}]
+    fresh: list[dict[str, str | None]] = [
         {"url": "https://example.com/1", "title": "A", "snippet": "a"},
         {"url": "https://example.com/2", "title": "B", "snippet": "b"},
     ]
