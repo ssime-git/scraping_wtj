@@ -1,10 +1,10 @@
-# Local WTTJ Scheduler on WSL
+# Local WTTJ Systemd Timer on WSL
 
 The live WTTJ scrape no longer runs inside GitHub Actions.
 
 Production execution path:
-- `systemd --user` timer wakes the local scheduler every 30 min
-- local scheduler decides whether today's scrape is due
+- `systemd --user` timer runs once daily with a 2h randomized delay
+- missed runs are caught up when WSL starts again (`Persistent=true`)
 - local scrape service runs the WTTJ scrape and HF upload
 
 GitHub Actions responsibility:
@@ -19,8 +19,9 @@ Symlinks keep unit files in sync with the repo — after a `git pull` that modif
 ```bash
 mkdir -p ~/.config/systemd/user ~/.local/state/wttj-scrape
 ln -sf "$(pwd)/deploy/systemd/wttj-scrape.service" ~/.config/systemd/user/
-ln -sf "$(pwd)/deploy/systemd/wttj-scheduler.service" ~/.config/systemd/user/
 ln -sf "$(pwd)/deploy/systemd/wttj-scheduler.timer" ~/.config/systemd/user/
+rm -f ~/.config/systemd/user/wttj-scheduler.service
+loginctl enable-linger "$USER"
 systemctl --user daemon-reload
 systemctl --user enable --now wttj-scheduler.timer
 ```
@@ -44,9 +45,16 @@ WTTJ_MATCHES_CONFIG=/home/seb/project/scraping_wtj/config/wttj_matches.yaml
 DATA_DIR=/home/seb/project/scraping_wtj/data
 WTTJ_DEBUG_DIR=/home/seb/project/scraping_wtj/artifacts/wttj-debug
 WTTJ_AUTH_STATE_PATH=/home/seb/.local/state/wttj-scrape/auth-state.json
-WTTJ_WINDOW_START=03:30
-WTTJ_WINDOW_END=05:30
-WTTJ_SCHEDULER_SEED=wttj-prod
+```
+
+## Windows bootstrap
+
+WSL cannot run timers while the Windows host or the WSL distro is stopped. Add
+a Windows scheduled task so WSL starts after login and systemd can catch up the
+missed timer:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy/windows/register-wsl-bootstrap.ps1 -User seb
 ```
 
 ## Operations

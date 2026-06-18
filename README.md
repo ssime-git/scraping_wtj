@@ -7,8 +7,7 @@ Scrapes authenticated job offers from Welcome to the Jungle daily, stores them a
 ```mermaid
 flowchart TD
     subgraph LOCAL["Local machine (WSL2)"]
-        TIMER["wttj-scheduler.timer\nevery 30 min"]
-        SCHED["run_scheduler_check.py\ndecision: run or skip"]
+        TIMER["wttj-scheduler.timer\ndaily + randomized delay"]
         SCRAPE["run_local_scrape_and_upload.py\nscrape + upload"]
         LOCK["run.lock\nflock"]
         STATE["state.json\nlast run status"]
@@ -27,8 +26,7 @@ flowchart TD
         DEPLOY["Actions\nDeploy to HF Spaces\n(on app change)"]
     end
 
-    TIMER -->|"every 30 min"| SCHED
-    SCHED -->|"due + unlocked"| SCRAPE
+    TIMER -->|"due + catch-up"| SCRAPE
     SCRAPE --> LOCK
     SCRAPE --> STATE
     SCRAPE --> AUTH
@@ -46,8 +44,7 @@ flowchart TD
 
 | Component | Where it runs | What it does |
 |---|---|---|
-| `wttj-scheduler.timer` | Local WSL2 | Wakes the scheduler every 30 min |
-| `run_scheduler_check.py` | Local WSL2 | Decides whether today's scrape is due |
+| `wttj-scheduler.timer` | Local WSL2 | Runs the scrape daily with a 2h randomized delay and reboot catch-up |
 | `run_local_scrape_and_upload.py` | Local WSL2 | Runs scrape → parquet → HF upload |
 | `auth-state.json` | Local WSL2 | Cached Playwright storage state used for headless reauth |
 | HF Dataset `huggingsime/wttj-jobs` | Hugging Face | Stores `jobs.parquet` (private) |
@@ -57,15 +54,13 @@ flowchart TD
 
 ## Scheduling logic
 
-The scheduler picks a **deterministic random time** each day within a configured window (default `03:30–05:30`). The target is computed from a SHA-256 hash of the seed + date, so it is stable across restarts but varies day to day.
+Systemd runs the scrape once per day at `03:30` plus up to `2h` of native randomized delay. `Persistent=true` catches up a missed run when WSL starts again.
 
 ```
-Timer fires every 30 min
-  └─ already succeeded today?  → skip
-  └─ already failed today?     → skip
-  └─ lock held?                → skip (another run in progress)
-  └─ before target time?       → skip
-  └─ otherwise                 → start wttj-scrape.service
+Timer due or caught up
+  └─ start wttj-scrape.service
+      └─ flock prevents overlap
+      └─ systemd retries failed runs
 ```
 
 ## Repository layout
@@ -74,15 +69,15 @@ Timer fires every 30 min
 .
 ├── packages/
 │   ├── wttj-models/     # Pydantic data models
-│   ├── wttj-scraper/    # Playwright scraper + scheduler logic
+│   ├── wttj-scraper/    # Playwright scraper + run state helpers
 │   ├── wttj-cli/        # CLI entrypoint (wttj command)
 │   └── wttj-app/        # Streamlit browsing app
 ├── scripts/
 │   ├── scrape_matches_to_parquet.py   # authenticated scrape
 │   ├── upload_parquet_to_hf.py        # standalone HF upload
-│   ├── run_local_scrape_and_upload.py # orchestrator (called by systemd)
-│   └── run_scheduler_check.py         # scheduling decision (called by timer)
+│   └── run_local_scrape_and_upload.py # scrape + upload job (called by systemd)
 ├── deploy/systemd/      # systemd unit files
+├── deploy/windows/      # WSL bootstrap scheduled task helper
 ├── config/
 │   └── wttj_matches.yaml  # role families, filters, limits
 └── docs/
@@ -113,9 +108,6 @@ WTTJ_MATCHES_CONFIG=/path/to/scraping_wtj/config/wttj_matches.yaml
 DATA_DIR=/path/to/scraping_wtj/data
 WTTJ_DEBUG_DIR=/path/to/scraping_wtj/artifacts/wttj-debug
 WTTJ_AUTH_STATE_PATH=/path/to/.local/state/wttj-scrape/auth-state.json
-WTTJ_WINDOW_START=03:30
-WTTJ_WINDOW_END=05:30
-WTTJ_SCHEDULER_SEED=wttj-prod
 EOF
 ```
 
@@ -126,10 +118,18 @@ Symlinks keep the unit files in sync with the repo — after a `git pull` that m
 ```bash
 mkdir -p ~/.config/systemd/user ~/.local/state/wttj-scrape
 ln -sf "$(pwd)/deploy/systemd/wttj-scrape.service" ~/.config/systemd/user/
-ln -sf "$(pwd)/deploy/systemd/wttj-scheduler.service" ~/.config/systemd/user/
 ln -sf "$(pwd)/deploy/systemd/wttj-scheduler.timer" ~/.config/systemd/user/
+rm -f ~/.config/systemd/user/wttj-scheduler.service
+loginctl enable-linger "$USER"
 systemctl --user daemon-reload
 systemctl --user enable --now wttj-scheduler.timer
+```
+
+On WSL, add a Windows scheduled task so the distro starts after Windows login
+and systemd can catch up missed timers:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy/windows/register-wsl-bootstrap.ps1 -User seb
 ```
 
 After any `git pull` that touches `deploy/systemd/`:
@@ -174,6 +174,6 @@ Neither workflow runs the live scrape. All scraping runs locally via systemd.
 | Package | Description |
 |---|---|
 | [`wttj-models`](packages/wttj-models) | Pydantic models: `JobListing`, `JobDetail`, `ScrapeResult` |
-| [`wttj-scraper`](packages/wttj-scraper) | Playwright scraper, authenticated matches pipeline, local scheduler |
+| [`wttj-scraper`](packages/wttj-scraper) | Playwright scraper, authenticated matches pipeline, run state helpers |
 | [`wttj-cli`](packages/wttj-cli) | `wttj` CLI command for ad-hoc scraping |
 | [`wttj-app`](packages/wttj-app) | Streamlit app deployed on Hugging Face Spaces |

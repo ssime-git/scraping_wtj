@@ -1,10 +1,11 @@
 [Unit]
-Description=Wake WTTJ local scheduler every 30 minutes
+Description=Run WTTJ scrape daily
 
 [Timer]
-OnCalendar=*:0/30
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=2h
 Persistent=true
-Unit=wttj-scheduler.service
+Unit=wttj-scrape.service
 
 [Install]
 WantedBy=timers.target
