@@ -36,8 +36,8 @@ async def test_collect_family_jobs_stops_after_limit():
             "wttj_scraper.orchestrator.extract_listing_cards",
             AsyncMock(
                 return_value=[
-                    {"url": "https://example.com/1", "title": "A", "snippet": "a"},
-                    {"url": "https://example.com/2", "title": "B", "snippet": "b"},
+                    {"url": "https://example.com/1", "title": "Data Engineer", "snippet": "Spark"},
+                    {"url": "https://example.com/2", "title": "Senior Data Engineer", "snippet": "dbt"},
                 ]
             ),
         ),
@@ -50,6 +50,46 @@ async def test_collect_family_jobs_stops_after_limit():
     first_listing = scrape_detail_mock.await_args_list[0].args[1]
     assert first_listing.role_family == "data_engineer"
     assert first_listing.matched_role_query == "Data Engineer"
+
+
+@pytest.mark.asyncio
+async def test_collect_family_jobs_tags_each_listing_with_the_role_that_matched_it():
+    page = AsyncMock()
+    page.wait_for_timeout = AsyncMock()
+    family = FamilyConfig(roles=["Data Engineer", "Analytics Engineer"])
+    limits = LimitsConfig(max_jobs_per_family=2, max_pages_per_role=5)
+    timing = TimingConfig(
+        action_delay_seconds=(0.0, 0.0),
+        family_delay_seconds=(0.0, 0.0),
+        detail_delay_seconds=(0.0, 0.0),
+    )
+    scrape_detail_mock = AsyncMock(
+        side_effect=[
+            JobDetail(title="Data Engineer", url="https://example.com/1", snippet="Spark"),
+            JobDetail(title="Analytics Engineer", url="https://example.com/2", snippet="dbt"),
+        ]
+    )
+
+    with (
+        patch("wttj_scraper.orchestrator.apply_role_variant", AsyncMock()),
+        patch(
+            "wttj_scraper.orchestrator.extract_listing_cards",
+            AsyncMock(
+                side_effect=[
+                    [{"url": "https://example.com/1", "title": "Data Engineer", "snippet": "Spark"}],
+                    [{"url": "https://example.com/2", "title": "Analytics Engineer", "snippet": "dbt"}],
+                ]
+            ),
+        ),
+        patch("wttj_scraper.orchestrator.scrape_detail", scrape_detail_mock),
+    ):
+        await collect_family_jobs(page, AsyncMock(), family, limits, timing, "data_engineer")
+
+    listings = [call.args[1] for call in scrape_detail_mock.await_args_list]
+    assert [listing.matched_role_query for listing in listings] == [
+        "Data Engineer",
+        "Analytics Engineer",
+    ]
 
 
 @pytest.mark.asyncio

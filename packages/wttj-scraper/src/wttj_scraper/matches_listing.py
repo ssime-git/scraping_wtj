@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import re
+import unicodedata
 
 from playwright.async_api import Page
 
@@ -55,6 +57,54 @@ def dedupe_listing_urls(rows: Iterable[dict[str, str | None]]) -> list[dict[str,
         seen.add(url)
         out.append(row)
     return out
+
+
+def _fold(value: str) -> str:
+    return "".join(
+        char
+        for char in unicodedata.normalize("NFKD", value.casefold())
+        if not unicodedata.combining(char)
+    )
+
+
+def _role_tokens(role: str) -> list[str]:
+    tokens = [
+        token
+        for token in re.findall(r"[\w]+", _fold(role))
+        if len(token) > 2 or token in {"ai", "bi", "ml"}
+    ]
+    aliases = {
+        "ai": ["ia"],
+        "cybersecurity": ["cyber", "securite"],
+        "engineer": ["ingenieur"],
+        "ml": ["ia"],
+    }
+    expanded = tokens + [alias for token in tokens for alias in aliases.get(token, [])]
+    generic = {"analyst", "engineer", "ingenieur", "scientist"}
+    specific = [token for token in expanded if token not in generic]
+    return specific or expanded
+
+
+def keep_role_matches(
+    rows: Iterable[dict[str, str | None]], role: str
+) -> list[dict[str, str | None]]:
+    tokens = _role_tokens(role)
+    if not tokens:
+        return list(rows)
+    return [
+        row
+        for row in rows
+        if any(
+            token in _fold(f"{row.get('title') or ''} {row.get('snippet') or ''}")
+            for token in tokens
+        )
+    ]
+
+
+def tag_listing_cards(
+    rows: Iterable[dict[str, str | None]], role: str
+) -> list[dict[str, str | None]]:
+    return [{**row, "matched_role_query": role} for row in rows]
 
 
 def accumulate_family_candidates(

@@ -12,7 +12,12 @@ from wttj_scraper.config import FamilyConfig, LimitsConfig, MatchesConfig, Timin
 from wttj_scraper.detail import scrape_detail
 from wttj_scraper.matches_auth import login_to_matches
 from wttj_scraper.matches_filters import apply_global_filters, apply_role_variant
-from wttj_scraper.matches_listing import accumulate_family_candidates, extract_listing_cards
+from wttj_scraper.matches_listing import (
+    accumulate_family_candidates,
+    extract_listing_cards,
+    keep_role_matches,
+    tag_listing_cards,
+)
 
 
 async def _sleep_range(delay_range: tuple[float, float]) -> None:
@@ -28,14 +33,13 @@ async def collect_family_jobs(
     family_name: str,
 ) -> list[JobDetail]:
     candidates: list[dict[str, str | None]] = []
-    matched_role_query: str | None = None
     for role in family.roles:
         await apply_role_variant(page, role)
         await _sleep_range(timing.action_delay_seconds)
-        cards = await extract_listing_cards(page)
+        cards = tag_listing_cards(
+            keep_role_matches(await extract_listing_cards(page), role), role
+        )
         candidates = accumulate_family_candidates(candidates, cards, limits.max_jobs_per_family)
-        if cards and matched_role_query is None:
-            matched_role_query = role
         if len(candidates) >= limits.max_jobs_per_family:
             break
 
@@ -46,7 +50,7 @@ async def collect_family_jobs(
             url=row["url"],
             snippet=row.get("snippet"),
             role_family=family_name,
-            matched_role_query=matched_role_query,
+            matched_role_query=row.get("matched_role_query"),
         )
         detail = await scrape_detail(context, listing)
         results.append(detail)
