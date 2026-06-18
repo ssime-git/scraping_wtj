@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
+from contextlib import suppress
 import re
+from typing import Any
 
-from playwright.async_api import Locator
-from playwright.async_api import Page
+Locator = Any
+Page = Any
 
 _EXPERIENCE_LABELS = (
     "Débutant/Diplômé (0-1 an)",
@@ -33,11 +35,59 @@ async def _save_filters(page: Page) -> None:
     await page.wait_for_load_state("networkidle", timeout=120_000)
 
 
+async def _dismiss_axeptio_if_present(page: Page) -> bool:
+    """Try to dismiss known Axeptio cookie buttons or labeled cookie buttons.
+    Return True if a dismissal click was performed."""
+    for button_id in (
+        "axeptio_btn_configure",
+        "axeptio_btn_dismiss",
+        "axeptio_btn_acceptAll",
+        "axeptio_btn_acceptAllAndNext",
+        "axeptio_main_button",
+    ):
+        btn = page.locator(f"#{button_id}").first
+        if await btn.count():
+            try:
+                await btn.click(timeout=5_000)
+                return True
+            except Exception:
+                continue
+    for label in ("OK pour moi", "Non merci", "Je choisis", "J'accepte tout"):
+        btn = page.get_by_role("button", name=label).first
+        if await btn.count():
+            try:
+                await btn.click(timeout=5_000)
+                return True
+            except Exception:
+                continue
+    return False
+
+
+async def _safe_click(
+    page: Page, locator_obj, *, attempts: int = 4, retry_delay: float = 0.5
+) -> None:
+    """Attempt to click a locator, handling overlay interception by dismissing Axeptio and retrying."""
+    last_exc: Exception | None = None
+    for _ in range(attempts):
+        try:
+            await locator_obj.click(timeout=5_000)
+            return
+        except Exception as exc:
+            last_exc = exc
+            with suppress(Exception):
+                await locator_obj.scroll_into_view_if_needed()
+            with suppress(Exception):
+                await _dismiss_axeptio_if_present(page)
+            await asyncio.sleep(retry_delay)
+    if last_exc is not None:
+        raise last_exc
+
+
 async def _open_section(page: Page, title: str) -> None:
     section_button = page.get_by_role("button", name=title, exact=True).first
     expanded = await section_button.get_attribute("aria-expanded")
     if expanded != "true":
-        await section_button.click()
+        await _safe_click(page, section_button)
         for _ in range(25):
             await asyncio.sleep(0.2)
             if await section_button.get_attribute("aria-expanded") == "true":
@@ -49,7 +99,7 @@ async def _click_label(page: Page, label: str) -> None:
     target = page.locator("label").filter(has_text=label).first
     if await target.count() == 0:
         raise RuntimeError(f"Filter label not found: {label}")
-    await target.click()
+    await _safe_click(page, target)
 
 
 async def _set_text_input(locator: Locator, value: str) -> None:
@@ -70,7 +120,7 @@ async def _expand_contract_options(page: Page) -> None:
     if await toggle.count():
         toggle_text = (await toggle.text_content() or "").strip().lower()
         if "voir plus" in toggle_text:
-            await toggle.click()
+            await _safe_click(page, toggle)
 
 
 def _parse_salary_label(label: str) -> str | None:
@@ -85,7 +135,12 @@ def _parse_salary_label(label: str) -> str | None:
 
 
 async def _set_checkbox(page: Page, label: str, expected: bool) -> None:
-    checkbox = page.locator("label").filter(has_text=label).locator('input[type="checkbox"]').first
+    checkbox = (
+        page.locator("label")
+        .filter(has_text=label)
+        .locator('input[type="checkbox"]')
+        .first
+    )
     if await checkbox.count() == 0:
         if expected:
             raise RuntimeError(f"Checkbox not found for label: {label}")

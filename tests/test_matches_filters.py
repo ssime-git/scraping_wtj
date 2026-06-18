@@ -1,9 +1,9 @@
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
-from unittest.mock import call
 
 import pytest
 
+import wttj_scraper.matches_filters as mf
 from wttj_scraper.matches_filters import apply_global_filters
 from wttj_scraper.matches_filters import apply_role_variant
 from wttj_scraper.matches_filters import collect_visible_preference_chips
@@ -15,6 +15,14 @@ def _make_label_locator(*, checked: bool) -> MagicMock:
     locator.count = AsyncMock(return_value=1)
     locator.click = AsyncMock()
     locator.is_checked = AsyncMock(return_value=checked)
+    return locator
+
+
+def _make_absent_locator() -> MagicMock:
+    locator = MagicMock()
+    locator.first = locator
+    locator.count = AsyncMock(return_value=0)
+    locator.click = AsyncMock()
     return locator
 
 
@@ -110,7 +118,12 @@ async def test_apply_global_filters_sets_expected_checkbox_states_and_submits():
             label_root = MagicMock()
 
             def filter_side_effect(*, has_text: str) -> MagicMock:
-                return MagicMock(locator=MagicMock(return_value=label_states[has_text]), first=label_states[has_text], count=label_states[has_text].count, click=label_states[has_text].click)
+                return MagicMock(
+                    locator=MagicMock(return_value=label_states[has_text]),
+                    first=label_states[has_text],
+                    count=label_states[has_text].count,
+                    click=label_states[has_text].click,
+                )
 
             label_root.filter.side_effect = filter_side_effect
             return label_root
@@ -123,7 +136,11 @@ async def test_apply_global_filters_sets_expected_checkbox_states_and_submits():
     await apply_global_filters(
         page,
         location=["France"],
-        experience=["Débutant/Diplômé (0-1 an)", "Junior (1-3 ans)", "Intermédiaire (3-5 ans)"],
+        experience=[
+            "Débutant/Diplômé (0-1 an)",
+            "Junior (1-3 ans)",
+            "Intermédiaire (3-5 ans)",
+        ],
         remote=["Télétravail fréquent", "Pas de télétravail", "Télétravail total"],
         contract=["CDI", "CDD / Temporaire", "Stage"],
         salary=["≥ 10K €par an"],
@@ -157,3 +174,76 @@ async def test_collect_visible_preference_chips_reads_chip_texts():
     chips = await collect_visible_preference_chips(page)
 
     assert chips == ["France", "CDI"]
+
+
+@pytest.mark.asyncio
+async def test_safe_click_retries_and_dismisses(monkeypatch):
+    page = MagicMock()
+    locator = MagicMock()
+    attempts = {"count": 0}
+
+    async def click_side_effect(*args, **kwargs):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise Exception("intercepted")
+        return None
+
+    locator.click = AsyncMock(side_effect=click_side_effect)
+
+    dismiss = AsyncMock(return_value=True)
+    monkeypatch.setattr(mf, "_dismiss_axeptio_if_present", dismiss)
+
+    await mf._safe_click(page, locator, attempts=3, retry_delay=0)
+
+    assert locator.click.await_count == 2
+    dismiss.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_dismiss_axeptio_handles_accept_all_and_next_button():
+    page = MagicMock()
+
+    accept_all_and_next = MagicMock()
+    accept_all_and_next.first = accept_all_and_next
+    accept_all_and_next.count = AsyncMock(return_value=1)
+    accept_all_and_next.click = AsyncMock()
+
+    def locator_side_effect(selector: str):
+        mapping = {
+            "#axeptio_btn_configure": _make_absent_locator(),
+            "#axeptio_btn_dismiss": _make_absent_locator(),
+            "#axeptio_btn_acceptAll": _make_absent_locator(),
+            "#axeptio_main_button": _make_absent_locator(),
+            "#axeptio_btn_acceptAllAndNext": accept_all_and_next,
+        }
+        return mapping[selector]
+
+    page.locator.side_effect = locator_side_effect
+    page.get_by_role.return_value = _make_absent_locator()
+
+    dismissed = await mf._dismiss_axeptio_if_present(page)
+
+    assert dismissed is True
+    accept_all_and_next.click.assert_awaited_once_with(timeout=5_000)
+
+
+@pytest.mark.asyncio
+async def test_safe_click_scrolls_target_before_retry(monkeypatch):
+    page = MagicMock()
+    locator = MagicMock()
+    locator.scroll_into_view_if_needed = AsyncMock()
+    attempts = {"count": 0}
+
+    async def click_side_effect(*args, **kwargs):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise Exception("intercepted")
+        return None
+
+    locator.click = AsyncMock(side_effect=click_side_effect)
+    dismiss = AsyncMock(return_value=True)
+    monkeypatch.setattr(mf, "_dismiss_axeptio_if_present", dismiss)
+
+    await mf._safe_click(page, locator, attempts=3, retry_delay=0)
+
+    locator.scroll_into_view_if_needed.assert_awaited()
