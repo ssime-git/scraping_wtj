@@ -9,3 +9,4 @@ data/seen_urls.txt
 .env
 .superpowers/
 docs/superpowers/
+artifacts/wttj-debug/
