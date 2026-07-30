@@ -39,6 +39,10 @@ def experience_display_labels(series: pd.Series) -> pd.Series:
     return series.fillna(NON_PRECISE_LABEL)
 
 
+def filter_by_experience(df: pd.DataFrame, selected_experience: list[str]) -> pd.DataFrame:
+    return df[experience_display_labels(df["experience_label"]).isin(selected_experience)]
+
+
 def recent_offers_mask(df: pd.DataFrame, now: pd.Timestamp) -> pd.Series:
     if df.empty:
         return pd.Series(dtype=bool)
@@ -191,8 +195,7 @@ def main() -> None:
             options,
             default=[option for option in options if option in JUNIOR_DEFAULT_LABELS],
         )
-        if selected_experience:
-            df = df[experience_display_labels(df["experience_label"]).isin(selected_experience)]
+        df = filter_by_experience(df, selected_experience)
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Total offers", len(df))

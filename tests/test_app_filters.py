@@ -63,3 +63,19 @@ def test_recent_offers_mask_empty_dataframe():
     df = pd.DataFrame({"date_posted_estimated": [], "scraped_at": []})
     mask = recent_offers_mask(df, now)
     assert list(mask) == []
+
+
+def test_filter_by_experience_with_empty_selection_excludes_everything():
+    from wttj_app.app import filter_by_experience
+
+    df = pd.DataFrame({"experience_label": ["< 6 mois", "> 5 ans", None]})
+    result = filter_by_experience(df, [])
+    assert len(result) == 0
+
+
+def test_filter_by_experience_keeps_only_selected_labels():
+    from wttj_app.app import NON_PRECISE_LABEL, filter_by_experience
+
+    df = pd.DataFrame({"experience_label": ["< 6 mois", "> 5 ans", None]})
+    result = filter_by_experience(df, ["< 6 mois", NON_PRECISE_LABEL])
+    assert sorted(result.index) == [0, 2]
