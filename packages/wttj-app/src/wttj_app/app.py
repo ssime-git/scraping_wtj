@@ -19,14 +19,45 @@ DISPLAY_COLS = [
     "salary_label",
     "experience_label",
     "date_posted_label",
+    "date_posted_estimated",
     "job_url",
 ]
+
+RECENT_WINDOW_DAYS = 15
+RECENT_SCRAPE_FALLBACK_DAYS = 5
+NON_PRECISE_LABEL = "Non précisé"
+JUNIOR_DEFAULT_LABELS = {NON_PRECISE_LABEL, "< 6 mois", "> 6 mois"}
 
 
 def get_default_visible_columns(columns: list[str]) -> list[str]:
     preferred = [column for column in DISPLAY_COLS if column in columns]
     remaining = [column for column in columns if column not in preferred]
     return [*preferred, *remaining]
+
+
+def experience_display_labels(series: pd.Series) -> pd.Series:
+    return series.fillna(NON_PRECISE_LABEL)
+
+
+def recent_offers_mask(df: pd.DataFrame, now: pd.Timestamp) -> pd.Series:
+    if df.empty:
+        return pd.Series(dtype=bool)
+    empty_utc_dates = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns, UTC]")
+    posted = (
+        pd.to_datetime(df["date_posted_estimated"], utc=True, errors="coerce")
+        if "date_posted_estimated" in df.columns
+        else empty_utc_dates
+    )
+    scraped = (
+        pd.to_datetime(df["scraped_at"], utc=True, errors="coerce")
+        if "scraped_at" in df.columns
+        else empty_utc_dates
+    )
+    posted_recent = posted.notna() & ((now - posted) <= pd.Timedelta(days=RECENT_WINDOW_DAYS))
+    fallback_recent = posted.isna() & scraped.notna() & (
+        (now - scraped) <= pd.Timedelta(days=RECENT_SCRAPE_FALLBACK_DAYS)
+    )
+    return posted_recent | fallback_recent
 
 
 def check_credentials(username: str, password: str) -> bool:
@@ -144,6 +175,24 @@ def main() -> None:
         )
         if selected_cities:
             df = df[df["city"].isin(selected_cities)]
+
+    toggle_columns = st.columns(2)
+    recent_only = toggle_columns[0].checkbox(
+        "🕒 Offres récentes uniquement (≤15 j publication, repli ≤5 j scraping)"
+    )
+    if recent_only:
+        df = df[recent_offers_mask(df, pd.Timestamp.now(tz="UTC"))]
+
+    junior_only = toggle_columns[1].checkbox("🎯 Profils junior uniquement")
+    if junior_only and "experience_label" in df.columns:
+        options = sorted(experience_display_labels(df["experience_label"]).unique())
+        selected_experience = st.multiselect(
+            "Niveaux d'expérience retenus",
+            options,
+            default=[option for option in options if option in JUNIOR_DEFAULT_LABELS],
+        )
+        if selected_experience:
+            df = df[experience_display_labels(df["experience_label"]).isin(selected_experience)]
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Total offers", len(df))
