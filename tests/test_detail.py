@@ -1,7 +1,35 @@
+import json
 import pytest
 from unittest.mock import AsyncMock
 from wttj_models.job import JobDetail, JobListing
-from wttj_scraper.detail import parse_summary_metadata, scrape_detail
+from wttj_scraper.detail import _job_posting_from_scripts, parse_summary_metadata, scrape_detail
+
+
+@pytest.mark.parametrize("wrapper", [lambda job: job, lambda job: [job], lambda job: {"@graph": [job]}])
+def test_job_posting_ignores_invalid_and_unrelated_structured_data(wrapper):
+    posting = {"@type": "JobPosting", "hiringOrganization": {"name": "Shape It"}}
+    scripts = ["invalid JSON", json.dumps({"@type": "FAQPage"}), json.dumps(wrapper(posting))]
+    assert _job_posting_from_scripts(scripts) == posting
+
+
+@pytest.mark.asyncio
+async def test_scrape_detail_prefers_job_posting_company_and_location(mock_context_detail, mock_detail_page, base_listing):
+    mock_detail_page.evaluate.return_value = {
+        "page_title": "Data Engineer",
+        "company_name": "On recrute",
+        "city": None,
+        "structured_data": [json.dumps({
+            "@type": "JobPosting",
+            "hiringOrganization": {"name": "Shape It"},
+            "description": "<p>Construire des pipelines &amp; des outils.</p>",
+            "jobLocation": {"@type": "Place", "address": {"addressLocality": "Bègles"}},
+        })],
+    }
+    result = await scrape_detail(mock_context_detail, base_listing)
+    assert result.company_name == "Shape It"
+    assert result.city == "Bègles"
+    assert result.description_raw == "Construire des pipelines & des outils."
+    assert result.error is None
 
 
 @pytest.fixture

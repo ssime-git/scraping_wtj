@@ -34,6 +34,14 @@ families:
     roles: ["MLOps Engineer", "Data Platform Engineer", "MLOps"]
   cyber:
     roles: ["Cybersecurity", "Security Engineer", "Cloud Security", "AppSec"]
+  sap:
+    roles: ["SAP", "Consultant SAP", "Développeur SAP", "ABAP"]
+  devops:
+    roles: ["DevOps", "DevOps Engineer", "Ingénieur DevOps", "Site Reliability Engineer", "SRE"]
+  pbcn:
+    roles: ["PBCN"]
+  data_marketing:
+    roles: ["Data Marketing", "Marketing Data Analyst", "Marketing Analyst", "CRM Analyst", "Customer Insights Analyst"]
 
 limits:
   max_jobs_per_family: 25

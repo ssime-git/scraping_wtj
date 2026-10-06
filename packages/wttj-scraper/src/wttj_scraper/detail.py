@@ -1,4 +1,6 @@
+import json
 import re
+from html import unescape
 
 from playwright.async_api import BrowserContext
 from wttj_models.job import JobDetail, JobListing
@@ -33,6 +35,7 @@ _EXTRACT_JS = """
         normalize(document.title.split(' - ')[0]) ||
         null;
     return {
+        structured_data: collectTexts('script[type="application/ld+json"]'),
         page_title: primaryHeading,
         text_preview: normalize(document.body.innerText).slice(0, 3000),
         company_name: companyName,
@@ -50,6 +53,30 @@ _EXTRACT_JS = """
     };
 }
 """
+
+
+def _job_posting_from_scripts(scripts: list[str]) -> dict:
+    def find(value: object) -> dict:
+        if isinstance(value, list):
+            for item in value:
+                result = find(item)
+                if result:
+                    return result
+        elif isinstance(value, dict):
+            kind = value.get("@type")
+            if kind == "JobPosting" or isinstance(kind, list) and "JobPosting" in kind:
+                return value
+            return find(value.get("@graph"))
+        return {}
+
+    for script in scripts:
+        try:
+            result = find(json.loads(script))
+        except (ValueError, TypeError):
+            continue
+        if result:
+            return result
+    return {}
 
 
 def _compact(text: str | None) -> str:
@@ -370,6 +397,20 @@ async def scrape_detail(context: BrowserContext, job: JobListing) -> JobDetail:
         await page.goto(job.url, wait_until="domcontentloaded", timeout=60_000)
         await page.wait_for_timeout(1_200)
         details: dict = await page.evaluate(_EXTRACT_JS)
+        posting = _job_posting_from_scripts(details.pop("structured_data", []) or [])
+        organization = posting.get("hiringOrganization")
+        if isinstance(organization, dict) and organization.get("name"):
+            details["company_name"] = _compact(organization["name"])
+        if not details.get("description_raw") and isinstance(posting.get("description"), str):
+            details["description_raw"] = _compact(unescape(re.sub(r"<[^>]+>", " ", posting["description"]))) or None
+        locations = posting.get("jobLocation")
+        if isinstance(locations, list):
+            locations = locations[0] if locations else None
+        if isinstance(locations, dict):
+            address = locations.get("address")
+            if isinstance(address, dict) and address.get("addressLocality"):
+                details["city"] = _compact(address["addressLocality"])
+                details["location_label"] = details["city"]
         details["job_title"] = details.get("page_title") or job.title
         details["job_url"] = job.url
         details["job_id"] = job.url.rstrip("/").rsplit("/", 1)[-1]
