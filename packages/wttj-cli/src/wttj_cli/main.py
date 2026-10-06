@@ -1,6 +1,8 @@
 import argparse
 import asyncio
 
+import argcomplete
+
 from wttj_scraper import scrape, scrape_authenticated_matches
 
 _DEFAULT_URL = "https://www.welcometothejungle.com/fr/jobs"
@@ -18,7 +20,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
-    args = _build_parser().parse_args(argv)
+    parser = _build_parser()
+    argcomplete.autocomplete(parser)
+    args = parser.parse_args(argv)
     if args.config:
         result = asyncio.run(scrape_authenticated_matches(args.config))
     else:

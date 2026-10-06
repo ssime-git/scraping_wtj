@@ -5,8 +5,14 @@ __pycache__/
 .worktrees/
 data/*.csv
 data/*.parquet
+data/*.parquet.bak-*
 data/seen_urls.txt
 .env
 .superpowers/
 docs/superpowers/
-artifacts/wttj-debug/
+artifacts/
+.claude/settings.local.json
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json

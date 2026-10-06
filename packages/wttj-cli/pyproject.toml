@@ -2,7 +2,7 @@
 name = "wttj-cli"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["wttj-scraper"]
+dependencies = ["wttj-scraper", "argcomplete"]
 
 [project.scripts]
 wttj = "wttj_cli.main:main"
